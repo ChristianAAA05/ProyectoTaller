@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Clientes{% endblock %}
+{% block content %}
+<h2>Clientes</h2>
+<!-- poner un boton para poder agregar clientes como admin -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Dirección</th>
+            <th>Correo electrónico</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cliente in clientes %}
+        <tr>
+            <td>{{ cliente.nombre }}</td>
+            <td>{{ cliente.telefono }}</td>
+            <td>{{ cliente.direccion }}</td>
+            <td>{{ cliente.correo_electronico }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

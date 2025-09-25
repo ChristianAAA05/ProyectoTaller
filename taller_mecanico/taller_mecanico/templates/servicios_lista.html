@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Servicios{% endblock %}
+{% block content %}
+<h2>Servicios</h2>
+<!-- poner un boton para agregar servicios como admin -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre Servicio</th>
+            <th>Duración (min)</th>
+            <th>Costo</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for servicio in servicios %}
+        <tr>
+            <td>{{ servicio.nombre_servicio }}</td>
+            <td>{{ servicio.duracion }}</td>
+            <td>{{ servicio.costo }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Empleados{% endblock %}
+{% block content %}
+<h2>Empleados</h2>
+<!-- poner un boton para agregar empleados como admin -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Puesto</th>
+            <th>Teléfono</th>
+            <th>Correo electrónico</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for empleado in empleados %}
+        <tr>
+            <td>{{ empleado.nombre }}</td>
+            <td>{{ empleado.puesto }}</td>
+            <td>{{ empleado.telefono }}</td>
+            <td>{{ empleado.correo_electronico }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
