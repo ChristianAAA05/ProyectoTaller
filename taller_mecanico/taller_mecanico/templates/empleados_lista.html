@@ -1,26 +1,86 @@
 {% extends 'base.html' %}
-{% block title %}Lista de Empleados{% endblock %}
+{% block title %}Empleados - Taller Mecánico{% endblock %}
+
 {% block content %}
-<h2>Empleados</h2>
-<!-- poner un boton para agregar empleados como admin -->
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Nombre</th>
-            <th>Puesto</th>
-            <th>Teléfono</th>
-            <th>Correo electrónico</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for empleado in empleados %}
-        <tr>
-            <td>{{ empleado.nombre }}</td>
-            <td>{{ empleado.puesto }}</td>
-            <td>{{ empleado.telefono }}</td>
-            <td>{{ empleado.correo_electronico }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2>
+                <i class="fas fa-user-tie me-2"></i>Empleados
+            </h2>
+            <button class="btn btn-primary" disabled>
+                <i class="fas fa-plus me-2"></i>Agregar Empleado
+            </button>
+        </div>
+    </div>
+
+    {% if empleados %}
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="fas fa-user me-2"></i>Nombre</th>
+                                <th><i class="fas fa-briefcase me-2"></i>Puesto</th>
+                                <th><i class="fas fa-phone me-2"></i>Teléfono</th>
+                                <th><i class="fas fa-envelope me-2"></i>Correo Electrónico</th>
+                                <th><i class="fas fa-wrench me-2"></i>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for empleado in empleados %}
+                            <tr>
+                                <td>{{ empleado.nombre }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ empleado.puesto }}</span>
+                                </td>
+                                <td>{{ empleado.telefono }}</td>
+                                <td>{{ empleado.correo_electronico }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" disabled>
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" disabled>
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <p class="text-muted">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Total de empleados: <strong>{{ empleados.count }}</strong>
+                </p>
+                {% if puestos %}
+                <p class="text-muted">
+                    <i class="fas fa-tags me-2"></i>
+                    Puestos disponibles:
+                    {% for puesto in puestos %}
+                        <span class="badge bg-light text-dark me-1">{{ puesto }}</span>
+                    {% endfor %}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No hay empleados registrados</h4>
+                <p class="text-muted">Agrega tu primer empleado para comenzar.</p>
+                <button class="btn btn-primary" disabled>
+                    <i class="fas fa-plus me-2"></i>Agregar Empleado
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

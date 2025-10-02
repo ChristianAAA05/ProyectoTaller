@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework import generics
 from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
 from .serializers import (
@@ -74,22 +74,45 @@ class RegistroRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RegistroSerializer
 
 
-# --- Vistas de Plantilla ---
+# --- Vistas basadas en plantillas ---
 
 def inicio(request):
-    return render(request, 'inicio.html')
+    """Vista principal del taller mecánico"""
+    from django.utils import timezone
+    total_clientes = Cliente.objects.count()
+    total_empleados = Empleado.objects.count()
+    total_servicios = Servicio.objects.count()
+    total_vehiculos = Vehiculo.objects.count()
+    reparaciones_pendientes = Reparacion.objects.filter(estado='En progreso').count()
+    citas_hoy = Agenda.objects.filter(
+        fecha_hora__date=timezone.now().date()
+    ).count()
+
+    context = {
+        'total_clientes': total_clientes,
+        'total_empleados': total_empleados,
+        'total_servicios': total_servicios,
+        'total_vehiculos': total_vehiculos,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'citas_hoy': citas_hoy,
+    }
+    return render(request, 'inicio.html', context)
 
 def clientes_lista(request):
+    """Lista de clientes"""
     clientes = Cliente.objects.all()
     return render(request, 'clientes_lista.html', {'clientes': clientes})
 
 def empleados_lista(request):
+    """Lista de empleados"""
     empleados = Empleado.objects.all()
-    return render(request, 'empleados_lista.html', {'empleados': empleados})
+    context = {
+        'empleados': empleados,
+        'puestos': Empleado.objects.values_list('puesto', flat=True).distinct()
+    }
+    return render(request, 'empleados_lista.html', context)
 
 def servicios_lista(request):
+    """Lista de servicios"""
     servicios = Servicio.objects.all()
     return render(request, 'servicios_lista.html', {'servicios': servicios})
-
-    
-    

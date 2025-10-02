@@ -1,10 +1,126 @@
 {% extends 'base.html' %}
-{% block title %}Inicio - Taller Mecánico{% endblock %}
+{% block title %}Dashboard - Taller Mecánico{% endblock %}
+
 {% block content %}
-<h1>Bienvenido al Sistema de Gestión del Taller</h1>
-<p>Usa el menú para navegar entre clientes, empleados y servicios.</p>
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+            </h1>
+            <p class="text-muted">Bienvenido al Sistema de Gestión del Taller Mecánico</p>
+        </div>
+    </div>
+
+    <!-- Métricas principales -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card card-dashboard h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-3 text-primary"></i>
+                    <h3 class="card-title">{{ total_clientes }}</h3>
+                    <p class="card-text">Clientes Registrados</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card card-dashboard h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-tie fa-2x mb-3 text-success"></i>
+                    <h3 class="card-title">{{ total_empleados }}</h3>
+                    <p class="card-text">Empleados</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card card-dashboard h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-car fa-2x mb-3 text-warning"></i>
+                    <h3 class="card-title">{{ total_vehiculos }}</h3>
+                    <p class="card-text">Vehículos</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card card-dashboard h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-cogs fa-2x mb-3 text-info"></i>
+                    <h3 class="card-title">{{ total_servicios }}</h3>
+                    <p class="card-text">Servicios</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado de reparaciones -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>Reparaciones Pendientes
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="text-warning">{{ reparaciones_pendientes }}</h2>
+                    <p class="text-muted">Reparaciones en progreso</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-check me-2"></i>Citas de Hoy
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="text-info">{{ citas_hoy }}</h2>
+                    <p class="text-muted">Citas programadas para hoy</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Acciones Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'clientes-lista' %}" class="btn btn-outline-primary btn-lg w-100">
+                                <i class="fas fa-users me-2"></i>Ver Clientes
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'empleados-lista' %}" class="btn btn-outline-success btn-lg w-100">
+                                <i class="fas fa-user-tie me-2"></i>Ver Empleados
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'servicios-lista' %}" class="btn btn-outline-info btn-lg w-100">
+                                <i class="fas fa-cogs me-2"></i>Ver Servicios
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <button class="btn btn-outline-warning btn-lg w-100" disabled>
+                                <i class="fas fa-plus me-2"></i>Nueva Cita
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
-<!-- este en inicio de la pagina hay que mejorar pero de momento esto estabien 16/09/2025 -->
- <!-- lo que tengo pensado es poner botones que lleven a clientes, empleados y servicios como la parte de "mis curosos de intepy" -->
-    <!-- y poner una imagen de fondo que tenga que ver con mecanica automotriz -->
-     <!-- talez un calendario con las fechas ocupadas etc. -->

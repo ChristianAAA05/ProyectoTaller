@@ -1,24 +1,85 @@
 {% extends 'base.html' %}
-{% block title %}Lista de Servicios{% endblock %}
+{% block title %}Servicios - Taller Mecánico{% endblock %}
+
 {% block content %}
-<h2>Servicios</h2>
-<!-- poner un boton para agregar servicios como admin -->
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Nombre Servicio</th>
-            <th>Duración (min)</th>
-            <th>Costo</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for servicio in servicios %}
-        <tr>
-            <td>{{ servicio.nombre_servicio }}</td>
-            <td>{{ servicio.duracion }}</td>
-            <td>{{ servicio.costo }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2>
+                <i class="fas fa-cogs me-2"></i>Servicios
+            </h2>
+            <button class="btn btn-primary" disabled>
+                <i class="fas fa-plus me-2"></i>Agregar Servicio
+            </button>
+        </div>
+    </div>
+
+    {% if servicios %}
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="fas fa-wrench me-2"></i>Nombre del Servicio</th>
+                                <th><i class="fas fa-clock me-2"></i>Duración (min)</th>
+                                <th><i class="fas fa-dollar-sign me-2"></i>Costo</th>
+                                <th><i class="fas fa-align-left me-2"></i>Descripción</th>
+                                <th><i class="fas fa-tools me-2"></i>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servicio in servicios %}
+                            <tr>
+                                <td>{{ servicio.nombre_servicio }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ servicio.duracion }} min</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">${{ servicio.costo }}</span>
+                                </td>
+                                <td>
+                                    {% if servicio.descripcion %}
+                                        {{ servicio.descripcion|truncatechars:50 }}
+                                    {% else %}
+                                        <span class="text-muted">Sin descripción</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" disabled>
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" disabled>
+                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <p class="text-muted">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Total de servicios: <strong>{{ servicios.count }}</strong>
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No hay servicios registrados</h4>
+                <p class="text-muted">Agrega tu primer servicio para comenzar.</p>
+                <button class="btn btn-primary" disabled>
+                    <i class="fas fa-plus me-2"></i>Agregar Servicio
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}
