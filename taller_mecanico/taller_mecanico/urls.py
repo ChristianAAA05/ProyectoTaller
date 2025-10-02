@@ -16,8 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import render
-from gestion.views import clientes_lista, inicio
+from gestion.views import clientes_lista, empleados_lista, servicios_lista, inicio
 
 
 urlpatterns = [
@@ -27,6 +26,6 @@ urlpatterns = [
     # Rutas para las vistas basadas en plantillas
     path('', inicio, name='inicio'),
     path('clientes/lista/', clientes_lista, name='clientes-lista'),
-    path('empleados/lista/', render, {'template_name': 'empleados_lista.html'}, name='empleados-lista'),
-    path('servicios/lista/', render, {'template_name': 'servicios_lista.html'}, name='servicios-lista'),
+    path('empleados/lista/', empleados_lista, name='empleados-lista'),
+    path('servicios/lista/', servicios_lista, name='servicios-lista'),
 ]
