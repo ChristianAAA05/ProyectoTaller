@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework import generics
 from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
 from .serializers import (
@@ -74,22 +74,115 @@ class RegistroRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RegistroSerializer
 
 
-# --- Vistas de Plantilla ---
+# --- Vistas basadas en plantillas ---
 
 def inicio(request):
-    return render(request, 'inicio.html')
+    """Vista principal del taller mecánico"""
+    from django.utils import timezone
+
+    # Obtener métricas con manejo de errores
+    total_clientes = Cliente.objects.count()
+    total_vehiculos = Vehiculo.objects.count()
+    reparaciones_pendientes = Reparacion.objects.filter(estado='En progreso').count()
+    citas_hoy = Agenda.objects.filter(
+        fecha_hora__date=timezone.now().date()
+    ).count()
+
+    # Obtener empleados con manejo de errores
+    try:
+        total_empleados = Empleado.objects.count()
+        empleados_for_services = Empleado.objects.values_list('puesto', flat=True).distinct()
+    except Exception:
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM gestion_empleado")
+                total_empleados = cursor.fetchone()[0]
+                cursor.execute("SELECT DISTINCT puesto FROM gestion_empleado")
+                empleados_for_services = [row[0] for row in cursor.fetchall() if row[0]]
+        except Exception:
+            total_empleados = 0
+            empleados_for_services = []
+
+    # Obtener servicios con manejo de errores
+    try:
+        total_servicios = Servicio.objects.count()
+    except Exception:
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM gestion_servicio")
+                total_servicios = cursor.fetchone()[0]
+        except Exception:
+            total_servicios = 0
+
+    context = {
+        'total_clientes': total_clientes,
+        'total_empleados': total_empleados,
+        'total_servicios': total_servicios,
+        'total_vehiculos': total_vehiculos,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'citas_hoy': citas_hoy,
+    }
+    return render(request, 'inicio.html', context)
 
 def clientes_lista(request):
+    """Lista de clientes"""
     clientes = Cliente.objects.all()
     return render(request, 'clientes_lista.html', {'clientes': clientes})
 
 def empleados_lista(request):
-    empleados = Empleado.objects.all()
-    return render(request, 'empleados_lista.html', {'empleados': empleados})
+    """Lista de empleados"""
+    try:
+        empleados = Empleado.objects.all()
+        empleados_lista = list(empleados)  # Forzar evaluación del QuerySet
+        context = {
+            'empleados': empleados_lista,
+            'puestos': Empleado.objects.values_list('puesto', flat=True).distinct()
+        }
+    except Exception as e:
+        # Si hay error con el ORM, intentar consulta directa
+        empleados_lista = []
+        puestos = []
+        error_msg = f"Error con empleados: {str(e)}"
+
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT nombre, puesto, telefono, correo_electronico FROM gestion_empleado")
+                empleados_raw = cursor.fetchall()
+
+                # Crear objetos Empleado manualmente
+                for emp_data in empleados_raw:
+                    class EmpleadoTemp:
+                        def __init__(self, nombre, puesto, telefono, correo):
+                            self.nombre = nombre
+                            self.puesto = puesto
+                            self.telefono = telefono
+                            self.correo_electronico = correo
+
+                        def __str__(self):
+                            return self.nombre
+
+                    empleados_lista.append(EmpleadoTemp(*emp_data))
+
+                # Obtener puestos únicos
+                cursor.execute("SELECT DISTINCT puesto FROM gestion_empleado")
+                puestos_raw = cursor.fetchall()
+                puestos = [puesto[0] for puesto in puestos_raw if puesto[0]]
+
+        except Exception as db_error:
+            error_msg += f" | Error DB: {str(db_error)}"
+
+        context = {
+            'empleados': empleados_lista,
+            'puestos': puestos,
+            'error': error_msg
+        }
+
+    return render(request, 'empleados_lista.html', context)
 
 def servicios_lista(request):
+    """Lista de servicios"""
     servicios = Servicio.objects.all()
     return render(request, 'servicios_lista.html', {'servicios': servicios})
-
-    
-    
