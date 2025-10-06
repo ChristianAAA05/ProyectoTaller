@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from rest_framework import generics
+from django.core.exceptions import ValidationError
 from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
 from .serializers import (
     ClienteSerializer, EmpleadoSerializer, ServicioSerializer, 
@@ -55,23 +56,68 @@ class ReparacionRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
 
-# Agenda
-class AgendaListCreate(generics.ListCreateAPIView):
+# # Agenda
+# class AgendaListCreate(generics.ListCreateAPIView):
+#     queryset = Agenda.objects.all()
+#     serializer_class = AgendaSerializer
+
+# class AgendaRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Agenda.objects.all()
+#     serializer_class = AgendaSerializer
+
+# # Registro
+# class RegistroListCreate(generics.ListCreateAPIView):
+#     queryset = Registro.objects.all()
+#     serializer_class = RegistroSerializer
+
+# class RegistroRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Registro.objects.all()
+#     serializer_class = RegistroSerializer
+
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from .models import Agenda, Registro
+from .serializers import AgendaSerializer, RegistroSerializer
+
+class AgendaViewSet(viewsets.ModelViewSet):
     queryset = Agenda.objects.all()
     serializer_class = AgendaSerializer
 
-class AgendaRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Agenda.objects.all()
-    serializer_class = AgendaSerializer
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            cita = Agenda().programarCita(
+                cliente=serializer.validated_data['cliente'],
+                servicio=serializer.validated_data['servicio'],
+                fecha=serializer.validated_data['fecha'],
+                hora=serializer.validated_data['hora']
+            )
+        except ValidationError as e:
+            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+        output_serializer = self.get_serializer(cita)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-# Registro
-class RegistroListCreate(generics.ListCreateAPIView):
+
+class RegistroViewSet(viewsets.ModelViewSet):
     queryset = Registro.objects.all()
     serializer_class = RegistroSerializer
 
-class RegistroRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Registro.objects.all()
-    serializer_class = RegistroSerializer
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            registro = Registro().crearRegistro(
+                cliente = serializer.validated_data['cliente'],
+                empleado = serializer.validated_data['empleado'],
+                servicio = serializer.validated_data['servicio'],
+                fecha = serializer.validated_data.get('fecha', None)
+            )
+        except ValidationError as e:
+            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+        output_serializer = self.get_serializer(registro)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
 # --- Vistas basadas en plantillas ---
