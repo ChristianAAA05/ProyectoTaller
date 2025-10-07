@@ -1,13 +1,60 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from rest_framework import generics
+from django.contrib.auth import authenticate, login, logout
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from rest_framework import generics, viewsets, status
+from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
+
+from .decorators import jefe_required, empleados_management_required, servicios_management_required
+from .forms import ClienteForm, EmpleadoForm, ServicioForm
+from .models import (
+    Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
+)
 from .serializers import (
-    ClienteSerializer, EmpleadoSerializer, ServicioSerializer, 
+    ClienteSerializer, EmpleadoSerializer, ServicioSerializer,
     VehiculoSerializer, ReparacionSerializer, AgendaSerializer, RegistroSerializer
 )
 
 # Create your views here.
+
+# --- Vistas de Autenticación ---
+
+def login_view(request):
+    """Vista de login personalizado"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            messages.success(request, f'¡Bienvenido, {user.username}!')
+            
+            # Redirigir según el tipo de usuario
+            if hasattr(user, 'profile') and user.profile.es_empleado:
+                return redirect('inicio')
+            else:
+                return redirect('inicio')
+        else:
+            messages.error(request, 'Usuario o contraseña incorrectos.')
+    
+    return render(request, 'auth/login.html')
+
+
+def logout_view(request):
+    """Vista de logout"""
+    logout(request)
+    messages.info(request, 'Has cerrado sesión exitosamente.')
+    return redirect('login')
+
+
+@login_required
+def perfil_view(request):
+    """Vista de perfil de usuario"""
+    return render(request, 'auth/perfil.html', {'user': request.user})
+
 
 # --- Vistas de la API ---
 
@@ -56,30 +103,7 @@ class ReparacionRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
 
-# # Agenda
-# class AgendaListCreate(generics.ListCreateAPIView):
-#     queryset = Agenda.objects.all()
-#     serializer_class = AgendaSerializer
-
-# class AgendaRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = Agenda.objects.all()
-#     serializer_class = AgendaSerializer
-
-# # Registro
-# class RegistroListCreate(generics.ListCreateAPIView):
-#     queryset = Registro.objects.all()
-#     serializer_class = RegistroSerializer
-
-# class RegistroRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = Registro.objects.all()
-#     serializer_class = RegistroSerializer
-
-
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from .models import Agenda, Registro
-from .serializers import AgendaSerializer, RegistroSerializer
-
+# ViewSets con validaciones personalizadas
 class AgendaViewSet(viewsets.ModelViewSet):
     queryset = Agenda.objects.all()
     serializer_class = AgendaSerializer
@@ -122,6 +146,7 @@ class RegistroViewSet(viewsets.ModelViewSet):
 
 # --- Vistas basadas en plantillas ---
 
+@login_required
 def inicio(request):
     """Vista principal del taller mecánico"""
     from django.utils import timezone
@@ -172,11 +197,15 @@ def inicio(request):
     }
     return render(request, 'inicio.html', context)
 
+
+@login_required
 def clientes_lista(request):
     """Lista de clientes"""
     clientes = Cliente.objects.all()
     return render(request, 'clientes_lista.html', {'clientes': clientes})
 
+
+@login_required
 def empleados_lista(request):
     """Lista de empleados"""
     try:
@@ -228,7 +257,289 @@ def empleados_lista(request):
 
     return render(request, 'empleados_lista.html', context)
 
+
+@login_required
 def servicios_lista(request):
     """Lista de servicios"""
     servicios = Servicio.objects.all()
     return render(request, 'servicios_lista.html', {'servicios': servicios})
+
+
+@login_required
+@jefe_required
+def clientes_crear(request):
+    """Crear nuevo cliente usando ModelForm"""
+    if request.method == 'POST':
+        form = ClienteForm(request.POST)
+        if form.is_valid():
+            try:
+                cliente = form.save()
+                messages.success(request, f'Cliente "{cliente.nombre}" creado exitosamente.')
+                return redirect('clientes-lista')
+            except Exception as e:
+                messages.error(request, f'Error al crear cliente: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = ClienteForm()
+
+    context = {
+        'form': form,
+        'accion': 'Crear'
+    }
+    return render(request, 'clientes_form.html', context)
+
+
+@login_required
+@jefe_required
+def clientes_editar(request, pk):
+    """Editar cliente existente usando ModelForm"""
+    cliente = get_object_or_404(Cliente, pk=pk)
+
+    if request.method == 'POST':
+        form = ClienteForm(request.POST, instance=cliente)
+        if form.is_valid():
+            try:
+                cliente_actualizado = form.save()
+                messages.success(request, f'Cliente "{cliente_actualizado.nombre}" actualizado exitosamente.')
+                return redirect('clientes-lista')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar cliente: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = ClienteForm(instance=cliente)
+
+    context = {
+        'form': form,
+        'cliente': cliente,
+        'accion': 'Editar'
+    }
+    return render(request, 'clientes_form.html', context)
+
+
+@login_required
+@jefe_required
+def clientes_eliminar(request, pk):
+    """Eliminar cliente"""
+    cliente = get_object_or_404(Cliente, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            nombre = cliente.nombre
+            cliente.delete()
+            messages.success(request, f'Cliente "{nombre}" eliminado exitosamente.')
+            return redirect('clientes-lista')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar cliente: {str(e)}')
+
+    context = {'cliente': cliente}
+    return render(request, 'clientes_confirm_delete.html', context)
+
+
+@login_required
+@empleados_management_required
+def empleados_crear(request):
+    """Crear nuevo empleado usando ModelForm"""
+    if request.method == 'POST':
+        form = EmpleadoForm(request.POST)
+        if form.is_valid():
+            try:
+                empleado = form.save()
+                messages.success(request, f'Empleado "{empleado.nombre}" creado exitosamente.')
+                return redirect('empleados-lista')
+            except Exception as e:
+                messages.error(request, f'Error al crear empleado: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = EmpleadoForm()
+
+    context = {
+        'form': form,
+        'accion': 'Crear'
+    }
+    return render(request, 'empleados_form.html', context)
+
+
+@login_required
+@empleados_management_required
+def empleados_editar(request, pk):
+    """Editar empleado existente usando ModelForm"""
+    empleado = get_object_or_404(Empleado, pk=pk)
+
+    if request.method == 'POST':
+        form = EmpleadoForm(request.POST, instance=empleado)
+        if form.is_valid():
+            try:
+                empleado_actualizado = form.save()
+                messages.success(request, f'Empleado "{empleado_actualizado.nombre}" actualizado exitosamente.')
+                return redirect('empleados-lista')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar empleado: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = EmpleadoForm(instance=empleado)
+
+    context = {
+        'form': form,
+        'empleado': empleado,
+        'accion': 'Editar'
+    }
+    return render(request, 'empleados_form.html', context)
+
+
+@login_required
+@empleados_management_required
+def empleados_eliminar(request, pk):
+    """Eliminar empleado"""
+    empleado = get_object_or_404(Empleado, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            nombre = empleado.nombre
+            empleado.delete()
+            messages.success(request, f'Empleado "{nombre}" eliminado exitosamente.')
+            return redirect('empleados-lista')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar empleado: {str(e)}')
+
+    context = {'empleado': empleado}
+    return render(request, 'empleados_confirm_delete.html', context)
+
+
+@login_required
+@servicios_management_required
+def servicios_crear(request):
+    """Crear nuevo servicio usando ModelForm"""
+    if request.method == 'POST':
+        form = ServicioForm(request.POST)
+        if form.is_valid():
+            try:
+                servicio = form.save()
+                messages.success(request, f'Servicio "{servicio.nombre_servicio}" creado exitosamente.')
+                return redirect('servicios-lista')
+            except Exception as e:
+                messages.error(request, f'Error al crear servicio: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = ServicioForm()
+
+    context = {
+        'form': form,
+        'accion': 'Crear'
+    }
+    return render(request, 'servicios_form.html', context)
+
+
+@login_required
+@servicios_management_required
+def servicios_editar(request, pk):
+    """Editar servicio existente usando ModelForm"""
+    servicio = get_object_or_404(Servicio, pk=pk)
+
+    if request.method == 'POST':
+        form = ServicioForm(request.POST, instance=servicio)
+        if form.is_valid():
+            try:
+                servicio_actualizado = form.save()
+                messages.success(request, f'Servicio "{servicio_actualizado.nombre_servicio}" actualizado exitosamente.')
+                return redirect('servicios-lista')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar servicio: {str(e)}')
+        else:
+            messages.error(request, 'Por favor corrija los errores en el formulario.')
+    else:
+        form = ServicioForm(instance=servicio)
+
+    context = {
+        'form': form,
+        'servicio': servicio,
+        'accion': 'Editar'
+    }
+    return render(request, 'servicios_form.html', context)
+
+
+@login_required
+@servicios_management_required
+def servicios_eliminar(request, pk):
+    """Eliminar servicio"""
+    servicio = get_object_or_404(Servicio, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            nombre = servicio.nombre_servicio
+            servicio.delete()
+            messages.success(request, f'Servicio "{nombre}" eliminado exitosamente.')
+            return redirect('servicios-lista')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar servicio: {str(e)}')
+
+    context = {'servicio': servicio}
+    return render(request, 'servicios_confirm_delete.html', context)
+
+# --- Funciones de utilidad para permisos ---
+
+def es_jefe(user):
+    """Verifica si el usuario es jefe (tiene permisos completos)"""
+    try:
+        return not user.profile.es_empleado or user.profile.empleado_relacionado.puesto.lower() == 'jefe'
+    except:
+        return False
+
+def es_encargado(user):
+    """Verifica si el usuario es un encargado con permisos limitados"""
+    try:
+        return (user.profile.es_empleado and
+                user.profile.empleado_relacionado.puesto.lower() in ['encargado', 'supervisor'])
+    except:
+        return False
+
+def puede_gestionar_empleados(user):
+    """Verifica si el usuario puede gestionar empleados (agregar/editar/eliminar)"""
+    return es_jefe(user)
+
+def puede_gestionar_servicios(user):
+    """Verifica si el usuario puede gestionar servicios (agregar/editar/eliminar)"""
+    return es_jefe(user)
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+
+class APIAuthenticationMixin:
+    """Mixin para agregar autenticación a las vistas de API"""
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+# Aplicar autenticación a todas las vistas de API
+ClienteListCreate.authentication_classes = [SessionAuthentication]
+ClienteListCreate.permission_classes = [IsAuthenticated]
+ClienteRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
+ClienteRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
+
+EmpleadoListCreate.authentication_classes = [SessionAuthentication]
+EmpleadoListCreate.permission_classes = [IsAuthenticated]
+EmpleadoRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
+EmpleadoRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
+
+ServicioListCreate.authentication_classes = [SessionAuthentication]
+ServicioListCreate.permission_classes = [IsAuthenticated]
+ServicioRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
+ServicioRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
+
+VehiculoListCreate.authentication_classes = [SessionAuthentication]
+VehiculoListCreate.permission_classes = [IsAuthenticated]
+VehiculoRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
+VehiculoRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
+
+ReparacionListCreate.authentication_classes = [SessionAuthentication]
+ReparacionListCreate.permission_classes = [IsAuthenticated]
+ReparacionRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
+ReparacionRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
+
+AgendaViewSet.authentication_classes = [SessionAuthentication]
+AgendaViewSet.permission_classes = [IsAuthenticated]
+RegistroViewSet.authentication_classes = [SessionAuthentication]
+RegistroViewSet.permission_classes = [IsAuthenticated]

@@ -2,15 +2,21 @@
 {% block title %}Servicios - Taller Mecánico{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" style="background-color: white; min-height: 100vh;">
     <div class="row mb-4">
         <div class="col-12 d-flex justify-content-between align-items-center">
             <h2>
                 <i class="fas fa-cogs me-2"></i>Servicios
             </h2>
-            <button class="btn btn-primary" disabled>
-                <i class="fas fa-plus me-2"></i>Agregar Servicio
-            </button>
+            {% if user.is_authenticated and puede_gestionar_servicios %}
+                <a href="{% url 'servicios-crear' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Agregar Servicio
+                </a>
+            {% else %}
+                <button class="btn btn-primary" disabled title="No tienes permisos para agregar servicios">
+                    <i class="fas fa-plus me-2"></i>Agregar Servicio
+                </button>
+            {% endif %}
         </div>
     </div>
 
@@ -46,12 +52,21 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" disabled>
-                                        <i class="fas fa-edit me-1"></i>Editar
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" disabled>
-                                        <i class="fas fa-trash me-1"></i>Eliminar
-                                    </button>
+                                    {% if user.is_authenticated and puede_gestionar_servicios %}
+                                        <a href="{% url 'servicios-editar' servicio.pk %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit me-1"></i>Editar
+                                        </a>
+                                        <a href="{% url 'servicios-eliminar' servicio.pk %}" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash me-1"></i>Eliminar
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="No tienes permisos">
+                                            <i class="fas fa-edit me-1"></i>Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="No tienes permisos">
+                                            <i class="fas fa-trash me-1"></i>Eliminar
+                                        </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -75,9 +90,32 @@
                 <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
                 <h4 class="text-muted">No hay servicios registrados</h4>
                 <p class="text-muted">Agrega tu primer servicio para comenzar.</p>
-                <button class="btn btn-primary" disabled>
-                    <i class="fas fa-plus me-2"></i>Agregar Servicio
-                </button>
+                {% if user.is_authenticated and puede_gestionar_servicios %}
+                    <a href="{% url 'servicios-crear' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Agregar Servicio
+                    </a>
+                {% else %}
+                    <button class="btn btn-primary" disabled title="No tienes permisos para agregar servicios">
+                        <i class="fas fa-plus me-2"></i>Agregar Servicio
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Información de permisos del usuario -->
+    {% if user.is_authenticated %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert {% if es_jefe %}alert-success{% else %}alert-info{% endif %}">
+                    <h6><i class="fas fa-user-shield me-2"></i>Estado de Permisos</h6>
+                    {% if es_jefe %}
+                        <p class="mb-0">Tienes permisos completos como <strong>Jefe</strong>.</p>
+                    {% else %}
+                        <p class="mb-0">Tienes permisos limitados como <strong>{{ user.profile.empleado_relacionado.puesto }}</strong>.</p>
+                        <small>No puedes agregar, editar o eliminar servicios.</small>
+                    {% endif %}
+                </div>
             </div>
         </div>
     {% endif %}

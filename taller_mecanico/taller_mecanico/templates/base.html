@@ -4,89 +4,173 @@
     {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Título de la página - se define en cada template hijo -->
     <title>{% block title %}Taller Mecánico{% endblock %}</title>
+
+    <!-- Archivos CSS externos -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<<<<<<< HEAD
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Estilos CSS personalizados -->
     <style>
+        /* Estilos específicos para las tarjetas del dashboard */
         .card-dashboard {
-            transition: transform 0.2s;
+            transition: transform 0.2s; /* Animación suave al hacer hover */
         }
         .card-dashboard:hover {
-            transform: translateY(-5px);
+            transform: translateY(-5px); /* Efecto de elevación al pasar el mouse */
         }
+
+        /* Estilo para el texto de la marca en el navbar */
         .navbar-brand {
-            font-weight: bold;
+            font-weight: bold; /* Texto en negrita para mayor visibilidad */
         }
+
+        /* Estilos para las tarjetas de métricas con gradientes */
         .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Gradiente azul-púrpura */
+            color: white; /* Texto blanco para contraste */
         }
         .metric-card.pending {
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            color: #721c24;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); /* Gradiente naranja para elementos pendientes */
+            color: #721c24; /* Texto oscuro para contraste */
         }
         .metric-card.success {
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-            color: #155724;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); /* Gradiente verde-rosa para elementos exitosos */
+            color: #155724; /* Texto oscuro para contraste */
+        }
+
+        /* Estilo para la información del usuario en el navbar */
+        .user-info {
+            font-size: 0.9rem; /* Tamaño de fuente ligeramente menor */
         }
     </style>
-=======
+
+    <!-- Carga de archivos CSS estáticos -->
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
->>>>>>> 1efa84ba (se agrego algunas cosas para el examen)
 </head>
 <body>
+    <!-- ========== NAVBAR PRINCIPAL ========== -->
+    <!-- Barra de navegación responsiva con menú desplegable -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
+            <!-- Marca/Logo del sitio -->
             <a class="navbar-brand" href="{% url 'inicio' %}">
                 <i class="fas fa-tools me-2"></i>Taller Mecánico
             </a>
+
+            <!-- Botón para dispositivos móviles -->
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
+
+            <!-- Contenido del navbar que se colapsa en móviles -->
             <div class="collapse navbar-collapse" id="navbarNav">
+                <!-- ========== MENÚ PRINCIPAL ========== -->
                 <ul class="navbar-nav me-auto">
+                    <!-- Dashboard -->
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'inicio' %}">
                             <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
+
+                    <!-- Menú desplegable de Clientes -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-users me-1"></i>Clientes
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{% url 'clientes-lista' %}">Ver Clientes</a></li>
+                            <!-- Aquí se pueden agregar más opciones de clientes -->
                         </ul>
                     </li>
+
+                    <!-- Menú desplegable de Empleados -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user-tie me-1"></i>Empleados
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{% url 'empleados-lista' %}">Ver Empleados</a></li>
+                            <!-- Aquí se pueden agregar más opciones de empleados -->
                         </ul>
                     </li>
+
+                    <!-- Menú desplegable de Servicios -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-cogs me-1"></i>Servicios
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{% url 'servicios-lista' %}">Ver Servicios</a></li>
+                            <!-- Aquí se pueden agregar más opciones de servicios -->
                         </ul>
                     </li>
+                </ul>
+
+                <!-- ========== MENÚ DE USUARIO ========== -->
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                        <!-- Usuario autenticado - mostrar menú de usuario -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i>
+                                <span class="user-info">{{ user.username }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'perfil' %}">
+                                        <i class="fas fa-user-circle me-2"></i>Mi Perfil
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'logout' %}">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <!-- Usuario no autenticado - mostrar enlace de login -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="fas fa-sign-in-alt me-1"></i>Iniciar Sesión
+                            </a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
 
+    <!-- ========== CONTENIDO PRINCIPAL ========== -->
     <div class="container-fluid mt-4">
+        <!-- ========== MENSAJES DE DJANGO ========== -->
+        <!-- Sistema de mensajes integrado de Django para feedback al usuario -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ========== BLOQUE DE CONTENIDO ========== -->
+        <!-- Aquí se inserta el contenido específico de cada página -->
         {% block content %}
         <!-- Contenido individual va aquí -->
         {% endblock %}
     </div>
 
+    <!-- ========== ARCHIVOS JAVASCRIPT ========== -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ========== BLOQUE PARA SCRIPTS ADICIONALES ========== -->
+    <!-- Los templates hijos pueden agregar scripts específicos si es necesario -->
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

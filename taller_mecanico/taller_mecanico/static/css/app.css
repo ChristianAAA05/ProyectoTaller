@@ -1,3 +1,7 @@
 /* CSS base para verificar la carga de estáticos */
-body { background-color: #f8f9fa; }
-.navbar-brand { font-weight: 600; }
+body {
+    background-color: white;
+}
+.navbar-brand {
+    font-weight: 600;
+}
