@@ -131,7 +131,7 @@ def inicio(request):
     total_vehiculos = Vehiculo.objects.count()
     reparaciones_pendientes = Reparacion.objects.filter(estado='En progreso').count()
     citas_hoy = Agenda.objects.filter(
-        fecha_hora__date=timezone.now().date()
+        fecha=timezone.now().date()
     ).count()
 
     # Obtener empleados con manejo de errores
