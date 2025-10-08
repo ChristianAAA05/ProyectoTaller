@@ -61,12 +61,13 @@ class Cliente(models.Model):
     Contiene información básica de contacto y permite relacionar múltiples vehículos.
     """
     nombre = models.CharField(max_length=100)
+    apellido = models.CharField(max_length=100)  # Campo agregado en migración
     telefono = models.CharField(max_length=15)
     direccion = models.CharField(max_length=255)
     correo_electronico = models.EmailField(unique=True)
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} {self.apellido}"
 
     class Meta:
         verbose_name = "Cliente"

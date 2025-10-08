@@ -28,11 +28,12 @@ class ClienteForm(forms.ModelForm):
     """
     class Meta:
         model = Cliente  # Modelo base para el formulario
-        fields = ['nombre', 'telefono', 'direccion', 'correo_electronico']  # Campos incluidos
+        fields = ['nombre', 'apellido', 'telefono', 'direccion', 'correo_electronico']  # Campos incluidos
 
         # Labels personalizados para mejorar la UX
         labels = {
             'nombre': 'Nombre del Cliente',
+            'apellido': 'Apellido del Cliente',
             'telefono': 'Teléfono',
             'direccion': 'Dirección',
             'correo_electronico': 'Correo Electrónico'
@@ -43,6 +44,10 @@ class ClienteForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',  # Clase Bootstrap para estilos
                 'placeholder': 'Ingrese el nombre del cliente'
+            }),
+            'apellido': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese el apellido del cliente'
             }),
             'telefono': forms.TextInput(attrs={
                 'class': 'form-control',
