@@ -87,8 +87,23 @@ python manage.py runserver
   - Rutas: `gestion/urls.py`
   - Migraciones: `gestion/migrations/`
 
-## Siguientes pasos sugeridos
-- Si usarás SQLite: aplica la Opción A y ejecuta migraciones.
-- Si usarás MariaDB/MySQL: instala `mysqlclient`, ajusta credenciales y luego migra.
-- Opcional: mover `SECRET_KEY` y credenciales a variables de entorno.
-- Solucionar enrutamiento en `gestion/urls.py` (no sobrescribir `urlpatterns`).
+## Permisos y Funcionalidades de Usuarios
+
+El sistema de gestión del taller mecánico define dos tipos de usuarios con permisos específicos para mantener la seguridad y eficiencia operativa.
+
+### 👨‍💼 Jefe
+- **Control total sobre la administración general del sistema.**
+- **Clientes:** Puede agregar, editar y eliminar clientes.
+- **Empleados:** Puede agregar, editar y eliminar empleados.
+- **Servicios del taller:** Puede agregar, editar y eliminar servicios.
+
+### 👨‍🔧 Encargado
+- **Clientes:** Puede agregar y eliminar clientes. Puede editar los datos de los clientes existentes.
+- **Agendar citas:** Puede agendar una cita para un cliente que llega presencialmente, seleccionando los servicios requeridos.
+- **Visualización de listas:**
+  - Ver la lista de servicios disponibles en el taller.
+  - Ver la lista de clientes registrados.
+  - Ver la lista de empleados registrados.
+
+Estos permisos aseguran que cada rol tenga acceso adecuado a las funcionalidades necesarias para sus responsabilidades diarias.
+

@@ -1,3 +1,4 @@
+from django.forms import formset_factory
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
@@ -7,7 +8,7 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 
 from .decorators import jefe_required, empleados_management_required, servicios_management_required
-from .forms import ClienteForm, EmpleadoForm, ServicioForm
+from .forms import ClienteForm, EmpleadoForm, ServicioForm, VehiculoForm
 from .models import (
     Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
 )
@@ -268,23 +269,52 @@ def servicios_lista(request):
 @login_required
 @jefe_required
 def clientes_crear(request):
-    """Crear nuevo cliente usando ModelForm"""
+    """Crear nuevo cliente con vehículos usando ModelForm y formsets"""
+    VehiculoFormSet = formset_factory(VehiculoForm, extra=1, can_delete=True)
+
     if request.method == 'POST':
         form = ClienteForm(request.POST)
-        if form.is_valid():
+        formset = VehiculoFormSet(request.POST, prefix='vehiculos')
+
+        if form.is_valid() and formset.is_valid():
             try:
+                # Crear el cliente primero
                 cliente = form.save()
-                messages.success(request, f'Cliente "{cliente.nombre}" creado exitosamente.')
+
+                # Crear los vehículos asociados
+                for vehiculo_form in formset:
+                    if vehiculo_form.cleaned_data.get('marca'):  # Solo si tiene datos
+                        vehiculo = vehiculo_form.save(commit=False)
+                        vehiculo.cliente = cliente
+                        vehiculo.save()
+
+                messages.success(request, f'Cliente "{cliente.nombre}" creado exitosamente con {formset.total_form_count()} vehículo(s).')
                 return redirect('clientes-lista')
+
             except Exception as e:
                 messages.error(request, f'Error al crear cliente: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            # Mostrar errores específicos
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'Cliente - {field}: {error}')
+
+            for i, vehiculo_form in enumerate(formset):
+                if vehiculo_form.errors:
+                    for field, errors in vehiculo_form.errors.items():
+                        for error in errors:
+                            messages.error(request, f'Vehículo {i+1} - {field}: {error}')
+
+            if formset.non_form_errors():
+                for error in formset.non_form_errors():
+                    messages.error(request, f'Vehículo: {error}')
     else:
         form = ClienteForm()
+        formset = VehiculoFormSet(prefix='vehiculos')
 
     context = {
         'form': form,
+        'formset': formset,
         'accion': 'Crear'
     }
     return render(request, 'clientes_form.html', context)
@@ -293,26 +323,69 @@ def clientes_crear(request):
 @login_required
 @jefe_required
 def clientes_editar(request, pk):
-    """Editar cliente existente usando ModelForm"""
+    """Editar cliente existente con vehículos usando ModelForm y formsets"""
     cliente = get_object_or_404(Cliente, pk=pk)
+    VehiculoFormSet = formset_factory(VehiculoForm, extra=1, can_delete=True)
 
     if request.method == 'POST':
         form = ClienteForm(request.POST, instance=cliente)
-        if form.is_valid():
+        formset = VehiculoFormSet(request.POST, prefix='vehiculos')
+
+        if form.is_valid() and formset.is_valid():
             try:
+                # Guardar el cliente primero
                 cliente_actualizado = form.save()
+
+                # Eliminar vehículos marcados para eliminación
+                for vehiculo_form in formset:
+                    if vehiculo_form.cleaned_data.get('DELETE', False):
+                        vehiculo_id = vehiculo_form.cleaned_data.get('id')
+                        if vehiculo_id:
+                            vehiculo_id.delete()
+
+                # Crear/actualizar vehículos
+                for vehiculo_form in formset:
+                    if vehiculo_form.cleaned_data.get('marca') and not vehiculo_form.cleaned_data.get('DELETE', False):
+                        vehiculo = vehiculo_form.save(commit=False)
+                        if hasattr(vehiculo_form, 'instance') and vehiculo_form.instance.pk:
+                            # Actualizar vehículo existente
+                            vehiculo.pk = vehiculo_form.instance.pk
+                        vehiculo.cliente = cliente_actualizado
+                        vehiculo.save()
+
                 messages.success(request, f'Cliente "{cliente_actualizado.nombre}" actualizado exitosamente.')
                 return redirect('clientes-lista')
+
             except Exception as e:
                 messages.error(request, f'Error al actualizar cliente: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            # Mostrar errores específicos
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'Cliente - {field}: {error}')
+
+            for i, vehiculo_form in enumerate(formset):
+                if vehiculo_form.errors:
+                    for field, errors in vehiculo_form.errors.items():
+                        for error in errors:
+                            messages.error(request, f'Vehículo {i+1} - {field}: {error}')
+
+            if formset.non_form_errors():
+                for error in formset.non_form_errors():
+                    messages.error(request, f'Vehículo: {error}')
     else:
         form = ClienteForm(instance=cliente)
+        # Crear formset con vehículos existentes
+        vehiculos_existentes = cliente.vehiculos.all()
+        formset = VehiculoFormSet(
+            prefix='vehiculos',
+            initial=[{'marca': v.marca, 'modelo': v.modelo, 'año': v.año, 'placa': v.placa} for v in vehiculos_existentes]
+        )
 
     context = {
         'form': form,
         'cliente': cliente,
+        'formset': formset,
         'accion': 'Editar'
     }
     return render(request, 'clientes_form.html', context)
@@ -351,7 +424,9 @@ def empleados_crear(request):
             except Exception as e:
                 messages.error(request, f'Error al crear empleado: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = EmpleadoForm()
 
@@ -378,7 +453,9 @@ def empleados_editar(request, pk):
             except Exception as e:
                 messages.error(request, f'Error al actualizar empleado: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = EmpleadoForm(instance=empleado)
 
@@ -423,7 +500,9 @@ def servicios_crear(request):
             except Exception as e:
                 messages.error(request, f'Error al crear servicio: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = ServicioForm()
 
@@ -450,7 +529,9 @@ def servicios_editar(request, pk):
             except Exception as e:
                 messages.error(request, f'Error al actualizar servicio: {str(e)}')
         else:
-            messages.error(request, 'Por favor corrija los errores en el formulario.')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = ServicioForm(instance=servicio)
 

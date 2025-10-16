@@ -39,11 +39,32 @@
                                 {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
+                                {{ form.apellido.label_tag }}
+                                {{ form.apellido }}
+                                {% if form.apellido.errors %}
+                                    <div class="text-danger">
+                                        {{ form.apellido.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 {{ form.telefono.label_tag }}
                                 {{ form.telefono }}
                                 {% if form.telefono.errors %}
                                     <div class="text-danger">
                                         {{ form.telefono.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.correo_electronico.label_tag }}
+                                {{ form.correo_electronico }}
+                                {% if form.correo_electronico.errors %}
+                                    <div class="text-danger">
+                                        {{ form.correo_electronico.errors.0 }}
                                     </div>
                                 {% endif %}
                             </div>
@@ -59,14 +80,80 @@
                             {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.correo_electronico.label_tag }}
-                            {{ form.correo_electronico }}
-                            {% if form.correo_electronico.errors %}
-                                <div class="text-danger">
-                                    {{ form.correo_electronico.errors.0 }}
+                        <!-- Sección de Vehículos -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-car me-2"></i>Vehículos del Cliente
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                {{ formset.management_form }}
+                                <div id="vehiculos-container">
+                                    {% for vehiculo_form in formset %}
+                                        <div class="vehiculo-form border rounded p-3 mb-3">
+                                            {% if vehiculo_form.non_field_errors %}
+                                                <div class="alert alert-danger">
+                                                    {{ vehiculo_form.non_field_errors.0 }}
+                                                </div>
+                                            {% endif %}
+
+                                            <div class="row">
+                                                <div class="col-md-3 mb-3">
+                                                    {{ vehiculo_form.marca.label_tag }}
+                                                    {{ vehiculo_form.marca }}
+                                                    {% if vehiculo_form.marca.errors %}
+                                                        <div class="text-danger">
+                                                            {{ vehiculo_form.marca.errors.0 }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-3 mb-3">
+                                                    {{ vehiculo_form.modelo.label_tag }}
+                                                    {{ vehiculo_form.modelo }}
+                                                    {% if vehiculo_form.modelo.errors %}
+                                                        <div class="text-danger">
+                                                            {{ vehiculo_form.modelo.errors.0 }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-2 mb-3">
+                                                    {{ vehiculo_form.año.label_tag }}
+                                                    {{ vehiculo_form.año }}
+                                                    {% if vehiculo_form.año.errors %}
+                                                        <div class="text-danger">
+                                                            {{ vehiculo_form.año.errors.0 }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-3 mb-3">
+                                                    {{ vehiculo_form.placa.label_tag }}
+                                                    {{ vehiculo_form.placa }}
+                                                    {% if vehiculo_form.placa.errors %}
+                                                        <div class="text-danger">
+                                                            {{ vehiculo_form.placa.errors.0 }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-1 mb-3 d-flex align-items-center">
+                                                    {% if vehiculo_form.instance.pk %}
+                                                        {{ vehiculo_form.DELETE }}
+                                                        <label for="{{ vehiculo_form.DELETE.id_for_label }}" class="form-check-label ms-2">
+                                                            <i class="fas fa-trash text-danger"></i>
+                                                        </label>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
                                 </div>
-                            {% endif %}
+
+                                <div class="text-center">
+                                    <button type="button" id="add-vehiculo" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-plus me-2"></i>Agregar Vehículo
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-flex justify-content-between">
@@ -83,5 +170,76 @@
             </div>
         </div>
     </div>
+
+    <!-- JavaScript para agregar vehículos dinámicamente -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addButton = document.getElementById('add-vehiculo');
+            const container = document.getElementById('vehiculos-container');
+            let formCount = 0;
+
+            // Obtener el contador inicial del management form si existe
+            const totalFormsInput = document.querySelector('input[name="vehiculos-TOTAL_FORMS"]');
+            if (totalFormsInput) {
+                formCount = parseInt(totalFormsInput.value) || 1;
+            } else {
+                // Si no hay management form, empezar desde 0 (caso de creación)
+                formCount = 0;
+            }
+
+            addButton.addEventListener('click', function() {
+                // Crear nuevo formulario de vehículo
+                const newForm = document.createElement('div');
+                newForm.className = 'vehiculo-form border rounded p-3 mb-3';
+                newForm.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="id_vehiculos-${formCount}-marca">Marca del Vehículo</label>
+                            <input type="text" name="vehiculos-${formCount}-marca" class="form-control" placeholder="Ingrese la marca del vehículo" id="id_vehiculos-${formCount}-marca">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_vehiculos-${formCount}-modelo">Modelo del Vehículo</label>
+                            <input type="text" name="vehiculos-${formCount}-modelo" class="form-control" placeholder="Ingrese el modelo del vehículo" id="id_vehiculos-${formCount}-modelo">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="id_vehiculos-${formCount}-año">Año del Vehículo</label>
+                            <input type="number" name="vehiculos-${formCount}-año" class="form-control" min="1900" max="2030" placeholder="Ingrese el año del vehículo" id="id_vehiculos-${formCount}-año">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_vehiculos-${formCount}-placa">Placa del Vehículo</label>
+                            <input type="text" name="vehiculos-${formCount}-placa" class="form-control" placeholder="Ingrese la placa del vehículo" style="text-transform: uppercase;" id="id_vehiculos-${formCount}-placa">
+                        </div>
+                        <div class="col-md-1 mb-3 d-flex align-items-center">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-vehiculo">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(newForm);
+                formCount++;
+
+                // Actualizar el contador de formularios en el management form si existe
+                if (totalFormsInput) {
+                    totalFormsInput.value = formCount;
+                }
+            });
+
+            // Manejar eliminación de vehículos
+            container.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-vehiculo') || e.target.closest('.remove-vehiculo')) {
+                    const vehiculoForm = e.target.closest('.vehiculo-form');
+                    vehiculoForm.remove();
+
+                    // Actualizar contador si existe management form
+                    if (totalFormsInput) {
+                        formCount = Math.max(0, formCount - 1);
+                        totalFormsInput.value = formCount;
+                    }
+                }
+            });
+        });
+    </script>
 </div>
 {% endblock %}

@@ -7,6 +7,7 @@ para crear y editar las entidades principales del sistema:
 - ClienteForm: Para gestionar información de clientes
 - EmpleadoForm: Para gestionar información de empleados
 - ServicioForm: Para gestionar el catálogo de servicios
+- VehiculoForm: Para gestionar vehículos de clientes
 
 Cada formulario incluye:
 - Validación automática de Django
@@ -17,7 +18,7 @@ Cada formulario incluye:
 """
 
 from django import forms
-from .models import Cliente, Empleado, Servicio
+from .models import Cliente, Empleado, Servicio, Vehiculo
 
 class ClienteForm(forms.ModelForm):
     """
@@ -141,5 +142,47 @@ class ServicioForm(forms.ModelForm):
                 'class': 'form-control',
                 'min': '1',      # Duración mínima de 1 minuto
                 'placeholder': 'Ingrese la duración en minutos'
+            })
+        }
+
+
+class VehiculoForm(forms.ModelForm):
+    """
+    Formulario para crear y editar vehículos de clientes.
+
+    Permite gestionar la información de los vehículos asociados a cada cliente.
+    """
+    class Meta:
+        model = Vehiculo  # Modelo base para el formulario
+        fields = ['marca', 'modelo', 'año', 'placa']  # Campos incluidos
+
+        # Labels descriptivos para cada campo
+        labels = {
+            'marca': 'Marca del Vehículo',
+            'modelo': 'Modelo del Vehículo',
+            'año': 'Año del Vehículo',
+            'placa': 'Placa del Vehículo'
+        }
+
+        # Widgets configurados para cada tipo de campo
+        widgets = {
+            'marca': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese la marca del vehículo'
+            }),
+            'modelo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese el modelo del vehículo'
+            }),
+            'año': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1900',      # Año mínimo
+                'max': '2030',      # Año máximo
+                'placeholder': 'Ingrese el año del vehículo'
+            }),
+            'placa': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese la placa del vehículo',
+                'style': 'text-transform: uppercase;'  # Convertir a mayúsculas
             })
         }
