@@ -1,0 +1,7 @@
+/* CSS base para verificar la carga de estáticos */
+body {
+    background-color: white;
+}
+.navbar-brand {
+    font-weight: 600;
+}

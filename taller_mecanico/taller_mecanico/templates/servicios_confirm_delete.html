@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Servicio - Taller Mecánico{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="background-color: white; min-height: 100vh;">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'inicio' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'servicios-lista' %}">Servicios</a></li>
+                    <li class="breadcrumb-item active">Eliminar Servicio</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Confirmar Eliminación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-warning me-2"></i>
+                        <strong>¿Estás seguro de que deseas eliminar este servicio?</strong>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <strong>Nombre:</strong>
+                        </div>
+                        <div class="col-sm-8">
+                            {{ servicio.nombre_servicio }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <strong>Duración:</strong>
+                        </div>
+                        <div class="col-sm-8">
+                            {{ servicio.duracion }} minutos
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <strong>Costo:</strong>
+                        </div>
+                        <div class="col-sm-8">
+                            ${{ servicio.costo }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <strong>Descripción:</strong>
+                        </div>
+                        <div class="col-sm-8">
+                            {% if servicio.descripcion %}
+                                {{ servicio.descripcion|truncatechars:100 }}
+                            {% else %}
+                                <span class="text-muted">Sin descripción</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Advertencia:</strong> Esta acción no se puede deshacer. Se eliminará permanentemente el servicio y podría afectar registros asociados.
+                    </div>
+
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-2"></i>Eliminar Servicio
+                        </button>
+                        <a href="{% url 'servicios-lista' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Cancelar
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

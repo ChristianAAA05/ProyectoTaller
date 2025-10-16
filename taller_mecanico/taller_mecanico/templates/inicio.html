@@ -2,120 +2,179 @@
 {% block title %}Dashboard - Taller Mecánico{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" style="background-color: white; min-height: 100vh;">
+    <!-- Header de bienvenida -->
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="mb-4">
-                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-            </h1>
-            <p class="text-muted">Bienvenido al Sistema de Gestión de Cliente</p>
+            <div class="jumbotron bg-gradient-primary text-dark rounded-3 p-5">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="display-4">
+                            <i class="fas fa-tools me-3 text-dark"></i>
+                            ¡Bienvenido al Taller Mecánico!
+                        </h1>
+                        <p class="lead">
+                            Sistema de gestión integral para tu taller automotriz
+                        </p>
+                        <p class="mb-0">
+                            {% if user.profile.es_empleado %}
+                                <strong>{{ user.get_full_name|default:user.username }}</strong> 
+                                {% if user.profile.empleado_relacionado %}
+                                    - {{ user.profile.empleado_relacionado.puesto }}
+                                {% endif %}
+                            {% else %}
+                                <strong>{{ user.get_full_name|default:user.username }}</strong> - Administrador
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <i class="fas fa-cog fa-4x opacity-75 text-dark"></i>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Métricas principales -->
+    <!-- Tarjetas de métricas -->
     <div class="row mb-4">
         <div class="col-md-3 mb-3">
-            <div class="card card-dashboard h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-users fa-2x mb-3 text-primary"></i>
-                    <h3 class="card-title">{{ total_clientes }}</h3>
-                    <p class="card-text">Clientes Registrados</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="card-title mb-0">{{ total_clientes }}</h2>
+                            <p class="card-text opacity-75">Clientes</p>
+                        </div>
+                        <i class="fas fa-users fa-2x opacity-50"></i>
+                    </div>
                 </div>
             </div>
         </div>
-
         <div class="col-md-3 mb-3">
-            <div class="card card-dashboard h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-user-tie fa-2x mb-3 text-success"></i>
-                    <h3 class="card-title">{{ total_empleados }}</h3>
-                    <p class="card-text">Empleados</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="card-title mb-0">{{ total_empleados }}</h2>
+                            <p class="card-text opacity-75">Empleados</p>
+                        </div>
+                        <i class="fas fa-user-tie fa-2x opacity-50"></i>
+                    </div>
                 </div>
             </div>
         </div>
-
         <div class="col-md-3 mb-3">
-            <div class="card card-dashboard h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-car fa-2x mb-3 text-warning"></i>
-                    <h3 class="card-title">{{ total_vehiculos }}</h3>
-                    <p class="card-text">Vehículos</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="card-title mb-0">{{ total_servicios }}</h2>
+                            <p class="card-text opacity-75">Servicios</p>
+                        </div>
+                        <i class="fas fa-cogs fa-2x opacity-50"></i>
+                    </div>
                 </div>
             </div>
         </div>
-
         <div class="col-md-3 mb-3">
-            <div class="card card-dashboard h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body text-center">
-                    <i class="fas fa-cogs fa-2x mb-3 text-info"></i>
-                    <h3 class="card-title">{{ total_servicios }}</h3>
-                    <p class="card-text">Servicios</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="card-title mb-0">{{ total_vehiculos }}</h2>
+                            <p class="card-text opacity-75">Vehículos</p>
+                        </div>
+                        <i class="fas fa-car fa-2x opacity-50"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Estado de reparaciones -->
+    <!-- Estado del sistema -->
     <div class="row mb-4">
         <div class="col-md-6 mb-3">
             <div class="card">
-                <div class="card-header bg-warning text-dark">
+                <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-clock me-2"></i>Reparaciones Pendientes
+                        <i class="fas fa-wrench me-2"></i>
+                        Estado de Reparaciones
                     </h5>
                 </div>
-                <div class="card-body text-center">
-                    <h2 class="text-warning">{{ reparaciones_pendientes }}</h2>
-                    <p class="text-muted">Reparaciones en progreso</p>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>En Progreso:</span>
+                        <span class="badge bg-warning">{{ reparaciones_pendientes|default:0 }}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" role="progressbar"
+                             style="width: {% if total_vehiculos and total_vehiculos > 0 %}{{ reparaciones_pendientes|default:0|floatformat:0 }}%{% else %}0%{% endif %}">
+                            {{ reparaciones_pendientes|default:0 }} / {{ total_vehiculos|default:0 }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
         <div class="col-md-6 mb-3">
             <div class="card">
-                <div class="card-header bg-info text-white">
+                <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-calendar-check me-2"></i>Citas de Hoy
+                        <i class="fas fa-calendar-alt me-2"></i>
+                        Citas de Hoy
                     </h5>
                 </div>
-                <div class="card-body text-center">
-                    <h2 class="text-info">{{ citas_hoy }}</h2>
-                    <p class="text-muted">Citas programadas para hoy</p>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Citas programadas:</span>
+                        <span class="badge bg-info">{{ citas_hoy }}</span>
+                    </div>
+                    <p class="text-muted mt-2 mb-0">
+                        {% if citas_hoy > 0 %}
+                            Tienes {{ citas_hoy }} cita(s) programada(s) para hoy
+                        {% else %}
+                            No hay citas programadas para hoy
+                        {% endif %}
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Acciones rápidas -->
+    <!-- Accesos rápidos -->
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-bolt me-2"></i>Acciones Rápidas
+                        <i class="fas fa-rocket me-2"></i>
+                        Acceso Rápido
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 mb-3">
-                            <a href="{% url 'clientes-lista' %}" class="btn btn-outline-primary btn-lg w-100">
-                                <i class="fas fa-users me-2"></i>Ver Clientes
+                            <a href="{% url 'clientes-lista' %}" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-users fa-2x mb-2"></i>
+                                <span>Clientes</span>
                             </a>
                         </div>
                         <div class="col-md-3 mb-3">
-                            <a href="{% url 'empleados-lista' %}" class="btn btn-outline-success btn-lg w-100">
-                                <i class="fas fa-user-tie me-2"></i>Ver Empleados
+                            <a href="{% url 'empleados-lista' %}" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-user-tie fa-2x mb-2"></i>
+                                <span>Empleados</span>
                             </a>
                         </div>
                         <div class="col-md-3 mb-3">
-                            <a href="{% url 'servicios-lista' %}" class="btn btn-outline-info btn-lg w-100">
-                                <i class="fas fa-cogs me-2"></i>Ver Servicios
+                            <a href="{% url 'servicios-lista' %}" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-cogs fa-2x mb-2"></i>
+                                <span>Servicios</span>
                             </a>
                         </div>
                         <div class="col-md-3 mb-3">
-                            <button class="btn btn-outline-warning btn-lg w-100" disabled>
-                                <i class="fas fa-plus me-2"></i>Nueva Cita
-                            </button>
+                            <a href="{% url 'perfil' %}" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4">
+                                <i class="fas fa-user-circle fa-2x mb-2"></i>
+                                <span>Mi Perfil</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -124,3 +183,48 @@
     </div>
 </div>
 {% endblock %}
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.jumbotron {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border-radius: 15px;
+}
+
+.metric-card {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(255, 255, 255, 0.15);
+}
+
+.btn-outline-primary, .btn-outline-info, .btn-outline-success, .btn-outline-secondary {
+    border-width: 2px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-primary:hover, .btn-outline-info:hover, .btn-outline-success:hover, .btn-outline-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+}
+
+.card {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.08);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #ffffff 0%, #fdfcfc 100%);
+    border-bottom: 1px solid rgba(253, 252, 252, 0.125);
+    border-radius: 15px 15px 0 0 !important;
+}

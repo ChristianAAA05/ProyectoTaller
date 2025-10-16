@@ -1,31 +1,60 @@
 """
-URL configuration for taller_mecanico project.
+Configuración de URLs principal para el proyecto Taller Mecánico
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+Este archivo configura las rutas URL principales del proyecto Django,
+incluyendo:
+
+- Redirección automática según estado de autenticación
+- Panel de administración de Django
+- URLs de la aplicación principal (gestion)
+- Configuración de archivos estáticos y de medios
+- Sobrescritura de URLs de autenticación estándar
+
+Las URLs están diseñadas para:
+- Redirigir usuarios no autenticados al login
+- Proporcionar acceso directo al dashboard para usuarios autenticados
+- Incluir todas las funcionalidades de la aplicación de gestión
+- Servir archivos estáticos en modo desarrollo
 """
+
 from django.contrib import admin
 from django.urls import path, include
-from gestion.views import clientes_lista, empleados_lista, servicios_lista, inicio
+from django.conf import settings
+from django.conf.urls.static import static
+from django.shortcuts import redirect
 
-
+# ========== URLS PRINCIPALES DEL PROYECTO ==========
 urlpatterns = [
+    # ========== PANEL DE ADMINISTRACIÓN ==========
+    # Django admin para gestión avanzada de la base de datos
     path('admin/', admin.site.urls),
-    path('api/', include('gestion.urls')),  # Ruta base para la API
 
-    # Rutas para las vistas basadas en plantillas
-    path('', inicio, name='inicio'),
-    path('clientes/lista/', clientes_lista, name='clientes-lista'),
-    path('empleados/lista/', empleados_lista, name='empleados-lista'),
-    path('servicios/lista/', servicios_lista, name='servicios-lista'),
+    # ========== REDIRECCIÓN INTELIGENTE ==========
+    # Redirección condicional según el estado de autenticación del usuario
+    # - Si está autenticado: redirige al dashboard (inicio)
+    # - Si no está autenticado: redirige al login
+    path('', lambda request: redirect('inicio') if request.user.is_authenticated else redirect('login')),
+
+    # ========== APLICACIÓN PRINCIPAL ==========
+    # Incluye todas las URLs de la aplicación de gestión del taller
+    # Esto incluye autenticación, CRUD de entidades, API REST, etc.
+    path('', include('gestion.urls')),
 ]
+
+# ========== CONFIGURACIÓN PARA ARCHIVOS ESTÁTICOS ==========
+# Servir archivos de medios (imágenes, documentos) en modo desarrollo
+# Esto es necesario para que los archivos subidos sean accesibles
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# ========== CONFIGURACIÓN DE AUTENTICACIÓN ==========
+# Sobrescritura de las URLs de autenticación estándar de Django
+# para usar nuestras vistas personalizadas de login/logout
+
+from django.urls import path
+from gestion.views import login_view
+
+# Insertar URL personalizada de login al inicio de urlpatterns
+# Esto sobreescribe la URL de login estándar de Django (/accounts/login/)
+# con nuestra vista personalizada que incluye lógica específica del taller
+urlpatterns.insert(0, path('accounts/login/', login_view, name='accounts_login'))

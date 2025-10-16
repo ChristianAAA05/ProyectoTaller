@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Empleado - Taller Mecánico{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="background-color: white; min-height: 100vh;">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'inicio' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'empleados-lista' %}">Empleados</a></li>
+                    <li class="breadcrumb-item active">Eliminar Empleado</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Confirmar Eliminación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-warning me-2"></i>
+                        <strong>¿Estás seguro de que deseas eliminar este empleado?</strong>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <strong>Nombre:</strong>
+                        </div>
+                        <div class="col-sm-9">
+                            {{ empleado.nombre }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <strong>Puesto:</strong>
+                        </div>
+                        <div class="col-sm-9">
+                            <span class="badge {% if empleado.puesto == 'Jefe' %}bg-danger{% else %}bg-info{% endif %}">
+                                {{ empleado.puesto }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <strong>Teléfono:</strong>
+                        </div>
+                        <div class="col-sm-9">
+                            {{ empleado.telefono }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <strong>Correo:</strong>
+                        </div>
+                        <div class="col-sm-9">
+                            {{ empleado.correo_electronico }}
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Advertencia:</strong> Esta acción no se puede deshacer. Se eliminará permanentemente el empleado y podría afectar otros registros asociados.
+                    </div>
+
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-2"></i>Eliminar Empleado
+                        </button>
+                        <a href="{% url 'empleados-lista' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Cancelar
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
