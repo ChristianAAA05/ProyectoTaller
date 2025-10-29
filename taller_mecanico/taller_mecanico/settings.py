@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',   # Manejo de sesiones
     'django.contrib.messages',   # Sistema de mensajes
     'django.contrib.staticfiles', # Manejo de archivos estáticos
+    'django.contrib.humanize',   # Filtros para formateo amigable
 
     # Aplicación principal del taller
     'gestion',                   # Nuestra app personalizada

@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from rest_framework import generics, viewsets, status
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
+from django.db.models.functions import ExtractMonth, ExtractYear
 
 from .decorators import jefe_required, empleados_management_required, servicios_management_required
 from .forms import ClienteForm, EmpleadoForm, ServicioForm, VehiculoForm
@@ -149,54 +150,245 @@ class RegistroViewSet(viewsets.ModelViewSet):
 
 @login_required
 def inicio(request):
-    """Vista principal del taller mecánico"""
+    """
+    Redirige al usuario al dashboard correspondiente según su rol.
+    """
+    if hasattr(request.user, 'profile') and request.user.profile.es_empleado:
+        # Verificar si es jefe
+        if es_jefe(request.user):
+            return redirect('dashboard_jefe')
+        # Si no es jefe, es encargado
+        return redirect('dashboard_encargado')
+    
+    # Si es cliente, redirigir al dashboard de cliente
+    return redirect('dashboard_cliente')
+
+@login_required
+@jefe_required
+def dashboard_jefe(request):
+    """Dashboard exclusivo para el jefe del taller"""
     from django.utils import timezone
-
-    # Obtener métricas con manejo de errores
+    from django.db.models import Count, Q, Sum, F, Case, When, IntegerField
+    
+    # Obtener la fecha actual
+    hoy = timezone.now().date()
+    
+    # Estadísticas generales
     total_clientes = Cliente.objects.count()
+    total_empleados = Empleado.objects.count()
+    total_servicios = Servicio.objects.count()
     total_vehiculos = Vehiculo.objects.count()
-    reparaciones_pendientes = Reparacion.objects.filter(estado='En progreso').count()
-    citas_hoy = Agenda.objects.filter(
-        fecha=timezone.now().date()
-    ).count()
-
-    # Obtener empleados con manejo de errores
-    try:
-        total_empleados = Empleado.objects.count()
-        empleados_for_services = Empleado.objects.values_list('puesto', flat=True).distinct()
-    except Exception:
-        try:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM gestion_empleado")
-                total_empleados = cursor.fetchone()[0]
-                cursor.execute("SELECT DISTINCT puesto FROM gestion_empleado")
-                empleados_for_services = [row[0] for row in cursor.fetchall() if row[0]]
-        except Exception:
-            total_empleados = 0
-            empleados_for_services = []
-
-    # Obtener servicios con manejo de errores
-    try:
-        total_servicios = Servicio.objects.count()
-    except Exception:
-        try:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM gestion_servicio")
-                total_servicios = cursor.fetchone()[0]
-        except Exception:
-            total_servicios = 0
-
+    
+    # Reparaciones
+    reparaciones = Reparacion.objects.all()
+    total_reparaciones = reparaciones.count()
+    reparaciones_pendientes = reparaciones.filter(estado='Pendiente').count()
+    reparaciones_en_proceso = reparaciones.filter(estado='En Proceso').count()
+    reparaciones_completadas = reparaciones.filter(estado='Completada').count()
+    
+    # Reparaciones recientes (últimas 5)
+    reparaciones_recientes = reparaciones.select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:5]
+    
+    # Citas
+    citas = Agenda.objects.all()
+    total_citas = citas.count()
+    
+    # Citas de hoy
+    citas_hoy = citas.filter(fecha=hoy).order_by('hora')
+    
+    # Próximas citas (próximos 7 días)
+    proxima_semana = hoy + timezone.timedelta(days=7)
+    citas_proximas = citas.filter(
+        fecha__range=[hoy, proxima_semana]
+    ).order_by('fecha', 'hora')[:10]
+    
+    # Empleados destacados (versión simplificada temporalmente)
+    # Primero obtenemos todos los empleados
+    empleados_destacados = Empleado.objects.all()[:5]  # Mostrar primeros 5 empleados
+    
+    # Agregamos manualmente el conteo de reparaciones
+    desde = timezone.now() - timezone.timedelta(days=30)
+    for empleado in empleados_destacados:
+        # Contar registros de este empleado en el último mes
+        empleado.num_reparaciones = Registro.objects.filter(
+            empleado=empleado,
+            fecha__gte=desde
+        ).count()
+    
+    # Reparaciones por estado (para gráfico)
+    estados_reparacion = ['Pendiente', 'En Proceso', 'Completada', 'Cancelada']
+    reparaciones_por_estado = []
+    for estado in estados_reparacion:
+        count = reparaciones.filter(estado=estado).count()
+        reparaciones_por_estado.append({
+            'estado': estado,
+            'total': count,
+            'porcentaje': round((count / total_reparaciones * 100) if total_reparaciones > 0 else 0, 1)
+        })
+    
+    # Ingresos mensuales (últimos 6 meses)
+    seis_meses_atras = hoy - timezone.timedelta(days=180)
+    # Versión simplificada temporalmente - mostrar solo el conteo de reparaciones
+    ingresos_mensuales = Reparacion.objects.filter(
+        fecha_ingreso__gte=seis_meses_atras,
+        estado='Completada'
+    ).annotate(
+        mes=ExtractMonth('fecha_ingreso'),
+        anio=ExtractYear('fecha_ingreso')
+    ).values('anio', 'mes').annotate(
+        total=Count('id')
+    ).order_by('anio', 'mes')
+    
+    # Preparar datos para la gráfica de ingresos
+    meses = []
+    ingresos = []
+    for ingreso in ingresos_mensuales:
+        meses.append(f"{ingreso['mes']}/{ingreso['anio']}")
+        ingresos.append(float(ingreso['total'] or 0))
+    
     context = {
+        'titulo': 'Panel del Jefe',
+        'es_jefe': True,
+        'es_encargado': False,
+        'hoy': hoy,
+        
+        # Estadísticas generales
         'total_clientes': total_clientes,
         'total_empleados': total_empleados,
         'total_servicios': total_servicios,
         'total_vehiculos': total_vehiculos,
+        'total_reparaciones': total_reparaciones,
+        'total_citas': total_citas,
+        
+        # Datos de reparaciones
         'reparaciones_pendientes': reparaciones_pendientes,
+        'reparaciones_en_proceso': reparaciones_en_proceso,
+        'reparaciones_completadas': reparaciones_completadas,
+        'reparaciones_recientes': reparaciones_recientes,
+        'reparaciones_por_estado': reparaciones_por_estado,
+        
+        # Datos de citas
         'citas_hoy': citas_hoy,
+        'citas_proximas': citas_proximas,
+        
+        # Empleados
+        'empleados_destacados': empleados_destacados,
+        
+        # Datos para gráficos
+        'meses_ingresos': meses,
+        'ingresos': ingresos,
     }
-    return render(request, 'inicio.html', context)
+    
+    return render(request, 'gestion/dashboard_jefe.html', context)
+
+@login_required
+def dashboard_encargado(request):
+    """Dashboard para encargados del taller"""
+    from django.utils import timezone
+    from django.db.models import Count, Q
+    
+    hoy = timezone.now().date()
+    
+    # Citas de hoy
+    citas_hoy = Agenda.objects.filter(
+        fecha=hoy
+    ).select_related('cliente', 'servicio').order_by('hora')
+    
+    # Reparaciones en progreso o pendientes
+    reparaciones_en_progreso = Reparacion.objects.filter(
+        estado__in=['En progreso', 'Pendiente']
+    ).select_related('vehiculo', 'servicio').order_by('fecha_ingreso')[:10]
+    
+    # Próximas citas (próximos 3 días)
+    proximos_dias = hoy + timezone.timedelta(days=3)
+    proximas_citas = Agenda.objects.filter(
+        fecha__range=[hoy, proximos_dias]
+    ).select_related('cliente', 'servicio').order_by('fecha', 'hora')[:5]
+    
+    # Estadísticas rápidas
+    total_citas_hoy = citas_hoy.count()
+    reparaciones_pendientes = Reparacion.objects.filter(
+        estado__in=['En progreso', 'Pendiente']
+    ).count()
+    
+    context = {
+        'titulo': 'Panel del Encargado',
+        'es_jefe': False,
+        'es_encargado': True,
+        'hoy': hoy,
+        'es_jefe': False,
+        'es_encargado': True,
+        'citas_hoy': citas_hoy,
+        'reparaciones_en_progreso': reparaciones_en_progreso,
+    }
+    
+    return render(request, 'gestion/dashboard_encargado.html', context)
+
+@login_required
+def dashboard_cliente(request):
+    """
+    Dashboard personalizado para clientes del taller.
+    Muestra información relevante sobre sus vehículos, citas y reparaciones.
+    """
+    from django.utils import timezone
+    
+    # Obtener el perfil del cliente
+    try:
+        perfil = request.user.profile
+        cliente = Cliente.objects.get(correo_electronico=request.user.email)
+    except (UserProfile.DoesNotExist, Cliente.DoesNotExist):
+        # Si no existe el perfil o el cliente, redirigir a completar registro
+        messages.info(request, 'Por favor, complete su perfil de cliente')
+        return redirect('completar_perfil')
+    
+    # Obtener los vehículos del cliente
+    vehiculos = Vehiculo.objects.filter(cliente=cliente)
+    
+    # Obtener las reparaciones recientes (últimos 3 meses)
+    tres_meses_atras = timezone.now() - timezone.timedelta(days=90)
+    reparaciones = Reparacion.objects.filter(
+        vehiculo__in=vehiculos,
+        fecha_ingreso__gte=tres_meses_atras
+    ).select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:5]
+    
+    # Obtener citas programadas (futuras y de hoy)
+    hoy = timezone.now().date()
+    citas = Agenda.objects.filter(
+        cliente=cliente,
+        fecha__gte=hoy
+    ).select_related('servicio').order_by('fecha', 'hora')
+    
+    # Obtener vehículos con reparaciones recientes
+    vehiculos_con_reparaciones = []
+    for vehiculo in vehiculos:
+        ultima_reparacion = Reparacion.objects.filter(
+            vehiculo=vehiculo
+        ).order_by('-fecha_ingreso').first()
+        vehiculos_con_reparaciones.append({
+            'vehiculo': vehiculo,
+            'ultima_reparacion': ultima_reparacion
+        })
+    
+    # Estadísticas rápidas
+    total_vehiculos = vehiculos.count()
+    total_reparaciones = Reparacion.objects.filter(
+        vehiculo__in=vehiculos
+    ).count()
+    total_citas_pendientes = citas.count()
+    
+    context = {
+        'titulo': 'Mi Espacio Cliente',
+        'cliente': cliente,
+        'vehiculos': vehiculos_con_reparaciones,
+        'reparaciones': reparaciones,
+        'citas': citas,
+        'total_vehiculos': total_vehiculos,
+        'total_reparaciones': total_reparaciones,
+        'total_citas_pendientes': total_citas_pendientes,
+        'hoy': hoy,
+    }
+    
+    return render(request, 'gestion/dashboard_cliente.html', context)
 
 
 @login_required

@@ -33,6 +33,16 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),        # Cierre de sesión
     path('perfil/', views.perfil_view, name='perfil'),         # Perfil de usuario
 
+    # ========== URLS DE DASHBOARDS ==========
+    # Página de inicio que redirige según el rol del usuario
+    path('inicio/', views.inicio, name='inicio'),
+    
+    # Dashboard para el jefe del taller
+    path('dashboard-jefe/', views.dashboard_jefe, name='dashboard_jefe'),
+    
+    # Dashboard para el encargado
+    path('dashboard-encargado/', views.dashboard_encargado, name='dashboard_encargado'),
+    
     # ========== URLS DE API REST ==========
     # URLs automáticas para operaciones CRUD usando Django REST Framework
     # Estas URLs siguen el patrón REST: GET, POST, PUT, DELETE
