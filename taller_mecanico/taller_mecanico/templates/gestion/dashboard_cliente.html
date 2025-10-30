@@ -1,0 +1,330 @@
+{% extends 'gestion/base_dashboard.html' %}
+
+{% block dashboard_content %}
+<div class="row">
+    <!-- Bienvenida -->
+    <div class="col-12 mb-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="mb-1">¡Bienvenido de nuevo, {{ cliente.nombre }}!</h4>
+                        <p class="mb-0">Aquí puedes gestionar tus vehículos, citas y ver el estado de tus reparaciones.</p>
+                    </div>
+                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                        <a href="#" class="btn btn-light">
+                            <i class="fas fa-plus me-1"></i> Nueva Cita
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Resumen de Vehículos -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Mis Vehículos</h6>
+                <span class="badge bg-primary rounded-pill">{{ total_vehiculos }}</span>
+            </div>
+            <div class="card-body">
+                {% if vehiculos %}
+                <div class="list-group list-group-flush">
+                    {% for item in vehiculos %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="avatar-sm">
+                                    <span class="avatar-title bg-light text-primary rounded-circle">
+                                        <i class="fas fa-car"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="mb-1">{{ item.vehiculo.marca }} {{ item.vehiculo.modelo }}</h6>
+                                <p class="mb-0 text-muted small">
+                                    {{ item.vehiculo.año }} • {{ item.vehiculo.placa }}
+                                    {% if item.ultima_reparacion %}
+                                    <br>
+                                    <span class="text-primary">
+                                        Último servicio: {{ item.ultima_reparacion.fecha_ingreso|date:"d/m/Y" }}
+                                    </span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-car fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-0">No tienes vehículos registrados</p>
+                    <a href="#" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fas fa-plus me-1"></i> Agregar Vehículo
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer text-end">
+                <a href="#" class="btn btn-sm btn-outline-primary">Ver todos los vehículos</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Próximas Citas -->
+    <div class="col-md-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Próximas Citas</h6>
+                <span class="badge bg-primary rounded-pill">{{ citas|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if citas %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Vehículo</th>
+                                <th>Servicio</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cita in citas %}
+                            <tr>
+                                <td>{{ cita.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ cita.hora|time:"H:i" }}</td>
+                                <td>{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}</td>
+                                <td>{{ cita.servicio.nombre_servicio|truncatechars:20 }}</td>
+                                <td>
+                                    <span class="badge bg-{{ cita.estado|lower }}">
+                                        {{ cita.estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" data-bs-toggle="tooltip" title="Cancelar cita">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center p-5">
+                    <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No tienes citas programadas</h5>
+                    <p class="text-muted mb-0">¡Agenda una cita para el mantenimiento de tu vehículo!</p>
+                    <a href="#" class="btn btn-primary mt-3">
+                        <i class="fas fa-plus me-1"></i> Solicitar Cita
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            {% if citas %}
+            <div class="card-footer text-end">
+                <a href="#" class="btn btn-sm btn-outline-primary">Ver todas las citas</a>
+                <a href="#" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus me-1"></i> Nueva Cita
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Historial de Reparaciones -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Historial de Reparaciones</h6>
+                <span class="badge bg-primary rounded-pill">{{ reparaciones|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if reparaciones %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Vehículo</th>
+                                <th>Servicio</th>
+                                <th>Estado</th>
+                                <th>Monto</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reparacion in reparaciones %}
+                            <tr>
+                                <td>{{ reparacion.fecha_ingreso|date:"d/m/Y" }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-2">
+                                            <span class="avatar-title bg-light text-dark rounded">
+                                                {{ reparacion.vehiculo.marca|first|upper }}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</div>
+                                            <small class="text-muted">{{ reparacion.vehiculo.placa }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ reparacion.servicio.nombre_servicio }}</td>
+                                <td>
+                                    <span class="badge bg-{{ reparacion.estado|lower }}">
+                                        {{ reparacion.estado }}
+                                    </span>
+                                </td>
+                                <td>${{ reparacion.servicio.precio|default:"0.00"|floatformat:2 }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" data-bs-toggle="tooltip" title="Descargar factura" {% if reparacion.estado != 'Completado' %}disabled{% endif %}>
+                                            <i class="fas fa-file-invoice"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center p-5">
+                    <i class="fas fa-tools fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No hay reparaciones registradas</h5>
+                    <p class="text-muted mb-0">Tus reparaciones aparecerán aquí una vez que se completen.</p>
+                </div>
+                {% endif %}
+            </div>
+            {% if reparaciones %}
+            <div class="card-footer text-end">
+                <a href="#" class="btn btn-sm btn-outline-primary">Ver historial completo</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Sección de Recordatorios -->
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h6 class="mb-0">Próximos Mantenimientos</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="alert-heading">Cambio de aceite recomendado</h6>
+                            <p class="mb-0">Tu vehículo {{ vehiculos.0.vehiculo.marca }} {{ vehiculos.0.vehiculo.modelo }} necesita cambio de aceite.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="alert-heading">Revisión de frenos</h6>
+                            <p class="mb-0">Es recomendable revisar el sistema de frenos de tu vehículo.</p>
+                        </div>
+                    </div>
+                </div>
+                <a href="#" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-calendar-plus me-1"></i> Agendar Mantenimiento
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h6 class="mb-0">Ofertas Especiales</h6>
+            </div>
+            <div class="card-body">
+                <div class="card bg-light border-0 mb-3">
+                    <div class="row g-0">
+                        <div class="col-md-4 d-flex align-items-center justify-content-center bg-primary text-white">
+                            <i class="fas fa-percentage fa-3x"></i>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card-body">
+                                <h6 class="card-title">15% de descuento</h6>
+                                <p class="card-text small">En tu próximo servicio de afinación mayor.</p>
+                                <button class="btn btn-sm btn-outline-primary">Aplicar oferta</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card bg-light border-0">
+                    <div class="row g-0">
+                        <div class="col-md-4 d-flex align-items-center justify-content-center bg-success text-white">
+                            <i class="fas fa-gift fa-3x"></i>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card-body">
+                                <h6 class="card-title">Lavado Gratis</h6>
+                                <p class="card-text small">Lavado básico gratis con cualquier reparación mayor a $500.</p>
+                                <button class="btn btn-sm btn-outline-success">Ver detalles</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sección de Soporte -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body text-center p-4">
+                <h5 class="mb-3">¿Necesitas ayuda?</h5>
+                <p class="text-muted mb-4">Nuestro equipo de soporte está disponible para ayudarte con cualquier pregunta o inquietud que tengas sobre tus vehículos o servicios.</p>
+                <button class="btn btn-primary me-2">
+                    <i class="fas fa-phone-alt me-1"></i> Llamar al Soporte
+                </button>
+                <button class="btn btn-outline-primary">
+                    <i class="fas fa-envelope me-1"></i> Enviar Mensaje
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para inicializar tooltips -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

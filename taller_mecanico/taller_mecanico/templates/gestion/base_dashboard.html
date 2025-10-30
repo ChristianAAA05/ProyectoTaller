@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Taller Mecánico{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'inicio' %}active{% endif %}" 
+                           href="{% url 'inicio' %}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    
+                    {% if es_jefe or es_encargado %}
+                    <!-- Menú para empleados (jefes y encargados) -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'clientes-lista' %}">
+                            <i class="fas fa-users"></i> Clientes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#vehiculosSubmenu">
+                            <i class="fas fa-car"></i> Vehículos
+                        </a>
+                        <div id="vehiculosSubmenu" class="collapse">
+                            <ul class="nav flex-column pl-3">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="#">Ver todos</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="#">Agregar vehículo</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'servicios-lista' %}">
+                            <i class="fas fa-tools"></i> Servicios
+                        </a>
+                    </li>
+                    {% if es_jefe %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'empleados-lista' %}">
+                            <i class="fas fa-user-tie"></i> Empleados
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-calendar-alt"></i> Citas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-wrench"></i> Reparaciones
+                        </a>
+                    </li>
+                    {% else %}
+                    <!-- Menú para clientes -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-car"></i> Mis Vehículos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-tools"></i> Mis Servicios
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-calendar-plus"></i> Solicitar Cita
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-history"></i> Historial
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                    <span>Configuración</span>
+                </h6>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'perfil' %}">
+                            <i class="fas fa-user-cog"></i> Perfil
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'logout' %}">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Contenido principal -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">{{ titulo }}</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <div class="btn-group me-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary">Hoy: {{ hoy|date:"d/m/Y" }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mensajes -->
+            {% if messages %}
+            <div class="row">
+                <div class="col-12">
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% block dashboard_content %}{% endblock %}
+            
+        </main>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+jefe
+En el dashboard del jefe se debe mostrar:
+- Debe poder ingresar a ver los vehiculos 
+- Debe poder agregar vehiculos, eliminarlos y modificarlos
+- Poder ver todas las repraciones, agregarlas, eliminarlas y modificarlas
+- Poder ver todas las citas
+- Debe poder crear citas, eliminarlas y modificarlas
+- Ver todas las proximas citas
+Luego hacer los test necesarios para ello y para el apartado de empleados destacados y estado de reparaciones
+La estetica es exelente en el dashboard de jefe
+Que funcinen adecuandamente los bloques de "Reparaciones recientes" , "Proximas citas" , "Empleados destacados" y "Estado de reparaciones"
+
+
+encargado
+En el dashboard del encargado se debe mostrar:
+- Debe poder ver los vehiculos, agregar vehiculos, eliminarlos y modificarlos
+- Debe poder ver las citas
+- Debe poder crear citas, eliminarlas y modificarlas
+- Debe poder ver las proximas citas
+- Debe poder ver las reparaciones en curso
+- poder ver las tareas pendientes 
+- poder agregar tareas, eliminarlas y modificarlas
+- poder ver las reparaciones
+- poder agregar reparaciones, eliminarlas y modificarlas
+Que funcionen adecuadamente los bloques "cita para hoy" , "Reparacion en curso" y "Tareas pendientes" "proximas citas"
