@@ -47,6 +47,15 @@ urlpatterns = [
     # URLs automáticas para operaciones CRUD usando Django REST Framework
     # Estas URLs siguen el patrón REST: GET, POST, PUT, DELETE
 
+    # ========== GESTIÓN DE VEHÍCULOS ==========
+    # Listado de vehículos
+    path('vehiculos/', views.VehiculoListView.as_view(), name='vehiculos-lista'),
+    path('vehiculos/agregar/', views.vehiculo_agregar, name='vehiculo-agregar'),
+    path('vehiculos/agregar/<int:cliente_id>/', views.vehiculo_agregar, name='vehiculo-agregar-cliente'),
+    path('vehiculos/editar/<int:pk>/', views.vehiculo_editar, name='vehiculo-editar'),
+    path('vehiculos/eliminar/<int:pk>/', views.vehiculo_eliminar, name='vehiculo-eliminar'),
+    path('api/clientes/buscar/', views.buscar_clientes, name='buscar-clientes'),
+    
     # Clientes - operaciones CRUD automáticas
     path('clientes/', views.ClienteListCreate.as_view(), name='clientes-list-create'),        # GET (listar), POST (crear)
     path('clientes/<int:pk>/', views.ClienteRetrieveUpdateDestroy.as_view(), name='cliente-detail'),  # GET, PUT, DELETE por ID
@@ -59,9 +68,9 @@ urlpatterns = [
     path('servicios/', views.ServicioListCreate.as_view(), name='servicios-list-create'),      # GET (listar), POST (crear)
     path('servicios/<int:pk>/', views.ServicioRetrieveUpdateDestroy.as_view(), name='servicio-detail'),  # GET, PUT, DELETE por ID
 
-    # Vehículos - operaciones CRUD automáticas
-    path('vehiculos/', views.VehiculoListCreate.as_view(), name='vehiculos-list-create'),      # GET (listar), POST (crear)
-    path('vehiculos/<int:pk>/', views.VehiculoRetrieveUpdateDestroy.as_view(), name='vehiculo-detail'),  # GET, PUT, DELETE por ID
+    # API Vehículos - operaciones CRUD automáticas
+    path('api/vehiculos/', views.VehiculoListCreate.as_view(), name='api-vehiculos-list-create'),      # GET (listar), POST (crear)
+    path('api/vehiculos/<int:pk>/', views.VehiculoRetrieveUpdateDestroy.as_view(), name='api-vehiculo-detail'),  # GET, PUT, DELETE por ID
 
     # Reparaciones - operaciones CRUD automáticas
     path('reparaciones/', views.ReparacionListCreate.as_view(), name='reparaciones-list-create'),      # GET (listar), POST (crear)

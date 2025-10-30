@@ -1,0 +1,397 @@
+{% extends 'gestion/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }} - Taller Mecánico{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 38px;
+        padding: 5px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    .cliente-seleccionado {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+        padding: 10px;
+        margin-bottom: 15px;
+        border-radius: 0.25rem;
+    }
+    .cliente-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+    }
+    .cliente-item:hover {
+        background-color: #f8f9fa;
+    }
+    .cliente-info {
+        margin-bottom: 0;
+    }
+    .cliente-cedula {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    #resultados_busqueda {
+        position: absolute;
+        z-index: 1000;
+        width: 100%;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        background: white;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">{{ titulo }}</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{% url 'vehiculos-lista' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Volver al listado
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    {% if cliente %}
+                    <div class="cliente-seleccionado mb-4">
+                        <h6 class="mb-1"><i class="fas fa-user-check text-primary me-2"></i> Cliente seleccionado</h6>
+                        <p class="cliente-info mb-1"><strong>{{ cliente.nombre_completo }}</strong></p>
+                        <p class="cliente-info mb-0"><small class="cliente-cedula">Cédula: {{ cliente.cedula }}</small></p>
+                        <input type="hidden" name="cliente" value="{{ cliente.id }}" id="id_cliente">
+                    </div>
+                    {% else %}
+                    <div class="mb-4">
+                        <label for="cliente_buscar" class="form-label">Buscar Cliente</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="cliente_buscar" 
+                                   placeholder="Buscar por nombre, apellido o cédula" autocomplete="off">
+                            <button class="btn btn-outline-secondary" type="button" id="limpiar_busqueda">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="resultados_busqueda" class="mt-1"></div>
+                        <small class="text-muted">Busque y seleccione un cliente para continuar</small>
+                    </div>
+                    {% endif %}
+
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if not cliente %}
+                        <div class="mb-3">
+                            <label for="cliente_buscar" class="form-label">Buscar Cliente</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="cliente_buscar" 
+                                       placeholder="Buscar por nombre, apellido o cédula...">
+                                <button class="btn btn-outline-secondary" type="button" id="btn_buscar_cliente">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                            <div id="resultados_busqueda" class="mt-2 d-none">
+                                <div class="list-group" id="lista_clientes">
+                                    <!-- Los resultados se cargarán aquí -->
+                                </div>
+                            </div>
+                            <div id="cliente_seleccionado" class="mt-2 d-none">
+                                <div class="alert alert-success py-2">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <span id="cliente_nombre"></span>
+                                    <input type="hidden" name="cliente" id="cliente_id">
+                                    <button type="button" class="btn-close float-end" id="cambiar_cliente"></button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.placa.id_for_label }}" class="form-label">
+                                    {{ form.placa.label }}
+                                    {% if form.placa.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ form.placa }}
+                                <div class="invalid-feedback">
+                                    {{ form.placa.errors|join:", " }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.marca.id_for_label }}" class="form-label">
+                                    {{ form.marca.label }}
+                                    {% if form.marca.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ form.marca }}
+                                <div class="invalid-feedback">
+                                    {{ form.marca.errors|join:", " }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.modelo.id_for_label }}" class="form-label">
+                                    {{ form.modelo.label }}
+                                    {% if form.modelo.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ form.modelo }}
+                                <div class="invalid-feedback">
+                                    {{ form.modelo.errors|join:", " }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.año.id_for_label }}" class="form-label">
+                                    {{ form.año.label }}
+                                    {% if form.año.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ form.año }}
+                                <div class="invalid-feedback">
+                                    {{ form.año.errors|join:", " }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Se han eliminado los campos no existentes en el modelo -->
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'vehiculos-lista' %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Inicializar Select2 para los select
+    $('.select2').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Seleccione una opción',
+        allowClear: true
+    });
+
+    // Variables globales
+    let timeoutId;
+    const resultadosBusqueda = $('#resultados_busqueda');
+    const clienteBuscar = $('#cliente_buscar');
+    const clienteSelect = $('#id_cliente_select');
+    const form = $('form');
+
+    // Función para buscar clientes
+    function buscarClientes(termino) {
+        if (termino.length < 2) {
+            resultadosBusqueda.hide().empty();
+            return;
+        }
+
+        clearTimeout(timeoutId);
+        
+        timeoutId = setTimeout(function() {
+            $.ajax({
+                url: '{% url "buscar-clientes" %}',
+                data: { 'q': termino },
+                dataType: 'json',
+                success: function(data) {
+                    if (data.clientes && data.clientes.length > 0) {
+                        let html = '';
+                        data.clientes.forEach(function(cliente) {
+                            html += `
+                            <div class="cliente-item" data-id="${cliente.id}">
+                                <div class="fw-bold">${cliente.nombre} ${cliente.apellido}</div>
+                                <div class="text-muted small">Cédula: ${cliente.cedula} | Tel: ${cliente.telefono || 'No especificado'}</div>
+                            </div>`;
+                        });
+                        resultadosBusqueda.html(html).show();
+                    } else {
+                        resultadosBusqueda.html('<div class="p-3 text-muted">No se encontraron clientes</div>').show();
+                    }
+                },
+                error: function() {
+                    resultadosBusqueda.html('<div class="p-3 text-danger">Error al buscar clientes</div>').show();
+                }
+            });
+        }, 300);
+    }
+
+    // Evento de búsqueda
+    clienteBuscar.on('input', function() {
+        buscarClientes($(this).val().trim());
+    });
+
+    // Seleccionar cliente
+    resultadosBusqueda.on('click', '.cliente-item', function() {
+        const clienteId = $(this).data('id');
+        const clienteNombre = $(this).find('.fw-bold').text();
+        const clienteCedula = $(this).find('.text-muted').text().split('|')[0].replace('Cédula:', '').trim();
+        
+        // Actualizar el campo oculto y mostrar la información del cliente
+        $('#id_cliente').val(clienteId);
+        
+        // Crear el elemento de cliente seleccionado
+        const clienteHtml = `
+            <div class="cliente-seleccionado mb-4">
+                <h6 class="mb-1"><i class="fas fa-user-check text-primary me-2"></i> Cliente seleccionado</h6>
+                <p class="cliente-info mb-1"><strong>${clienteNombre}</strong></p>
+                <p class="cliente-info mb-0"><small class="cliente-cedula">Cédula: ${clienteCedula}</small></p>
+                <input type="hidden" name="cliente" value="${clienteId}" id="id_cliente">
+            </div>`;
+        
+        // Reemplazar el buscador con la información del cliente
+        $('.mb-4:first').replaceWith(clienteHtml);
+        
+        // Ocultar resultados de búsqueda
+        resultadosBusqueda.hide();
+    });
+
+    // Limpiar búsqueda
+    $('#limpiar_busqueda').on('click', function() {
+        clienteBuscar.val('');
+        resultadosBusqueda.hide().empty();
+    });
+
+    // Cerrar resultados al hacer clic fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#resultados_busqueda, #cliente_buscar, #limpiar_busqueda').length) {
+            resultadosBusqueda.hide();
+        }
+    });
+
+    // Validación del formulario
+    form.on('submit', function(e) {
+        if (!$('#id_cliente').val()) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Debe seleccionar un cliente para el vehículo',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#0d6efd'
+            });
+            return false;
+        }
+        return true;
+    });
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Inicializar select2 para campos de selección
+    $('select').select2({
+        theme: 'bootstrap4',
+        width: '100%'
+    });
+
+    // Buscar cliente
+    $('#btn_buscar_cliente').click(function() {
+        const query = $('#cliente_buscar').val().trim();
+        if (query.length < 2) {
+            alert('Por favor ingrese al menos 2 caracteres para buscar');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "buscar-clientes" %}',
+            data: { q: query },
+            success: function(data) {
+                const $lista = $('#lista_clientes');
+                $lista.empty();
+                
+                if (data.length === 0) {
+                    $lista.append(`
+                        <div class="list-group-item">
+                            No se encontraron clientes con ese criterio de búsqueda.
+                        </div>
+                    `);
+                } else {
+                    data.forEach(function(cliente) {
+                        $lista.append(`
+                            <a href="#" class="list-group-item list-group-item-action cliente-item" 
+                               data-id="${cliente.id}">
+                                ${cliente.nombre} ${cliente.apellido} (${cliente.cedula})
+                            </a>
+                        `);
+                    });
+                }
+                
+                $('#resultados_busqueda').removeClass('d-none');
+            },
+            error: function() {
+                alert('Error al buscar clientes. Por favor intente nuevamente.');
+            }
+        });
+    });
+
+    // Seleccionar cliente
+    $(document).on('click', '.cliente-item', function(e) {
+        e.preventDefault();
+        const id = $(this).data('id');
+        const nombre = $(this).text().trim();
+        
+        $('#cliente_id').val(id);
+        $('#cliente_nombre').text(nombre);
+        $('#resultados_busqueda').addClass('d-none');
+        $('#cliente_seleccionado').removeClass('d-none');
+        
+        // Habilitar el formulario
+        $('form button[type="submit"]').prop('disabled', false);
+    });
+
+    // Cambiar cliente seleccionado
+    $('#cambiar_cliente').click(function() {
+        $('#cliente_seleccionado').addClass('d-none');
+        $('#cliente_buscar').val('').focus();
+        $('form button[type="submit"]').prop('disabled', true);
+    });
+
+    // Validación del formulario
+    (function() {
+        'use strict';
+        var forms = document.querySelectorAll('.needs-validation');
+        Array.prototype.slice.call(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+
+    // Si hay un cliente pre-seleccionado, habilitar el botón de guardar
+    {% if cliente %}
+    $('form button[type="submit"]').prop('disabled', false);
+    {% else %}
+    // Si no hay cliente seleccionado, deshabilitar el botón de guardar
+    $('form button[type="submit"]').prop('disabled', true);
+    {% endif %}
+});
+</script>
+{% endblock %}
