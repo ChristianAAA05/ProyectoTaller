@@ -65,6 +65,7 @@ class Cliente(models.Model):
     telefono = models.CharField(max_length=15)
     direccion = models.CharField(max_length=255)
     correo_electronico = models.EmailField(unique=True)
+    fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"

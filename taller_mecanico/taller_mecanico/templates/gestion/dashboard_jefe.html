@@ -3,30 +3,60 @@
 
 {% block dashboard_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Panel del Jefe</h2>
+    <div>
+        <h2 class="mb-1">Panel del Jefe</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'inicio' %}">Inicio</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Panel del Jefe</li>
+            </ol>
+        </nav>
+    </div>
     <div class="text-muted">
         <i class="fas fa-calendar-alt me-2"></i>{{ hoy|date:"l, d F Y" }}
     </div>
 </div>
 
+<!-- Alertas importantes -->
+{% if reparaciones_pendientes > 5 %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    Tienes <strong>{{ reparaciones_pendientes }} reparaciones pendientes</strong>. Revisa el estado de las reparaciones.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+</div>
+{% endif %}
+
+{% if citas_hoy.count > 0 %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <i class="fas fa-calendar-day me-2"></i>
+    Tienes <strong>{{ citas_hoy.count }} citas programadas</strong> para hoy.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+</div>
+{% endif %}
+
 <!-- Tarjetas de Resumen -->
 <div class="row">
     <!-- Total Clientes -->
     <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card border-left-primary shadow h-100">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
                             Clientes Registrados</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_clientes|intcomma }}</div>
+                        <div class="h2 mb-1">{{ total_clientes|intcomma }}</div>
+                        <div class="text-xs">
+                            <span class="text-success">
+                                <i class="fas fa-arrow-up"></i> {{ clientes_nuevos_este_mes }} este mes
+                            </span>
+                        </div>
                     </div>
                     <div class="col-auto">
-                        <i class="fas fa-users fa-2x text-gray-300"></i>
+                        <i class="fas fa-users fa-3x text-gray-300"></i>
                     </div>
                 </div>
             </div>
-            <div class="card-footer bg-transparent">
+            <div class="card-footer bg-transparent py-2">
                 <a href="{% url 'clientes-lista' %}" class="btn btn-sm btn-primary">Ver clientes</a>
                 <a href="{% url 'clientes-crear' %}" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-plus"></i> Nuevo
@@ -37,68 +67,87 @@
 
     <!-- Total Vehículos -->
     <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-success shadow h-100 py-2">
+        <div class="card border-left-success shadow h-100">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                            Vehículos</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_vehiculos|intcomma }}</div>
+                            Vehículos Registrados</div>
+                        <div class="h2 mb-1">{{ total_vehiculos|intcomma }}</div>
+                        <div class="text-xs">
+                            <span class="text-muted">Último mes: {{ vehiculos_frecuentes.count }} con más reparaciones</span>
+                        </div>
                     </div>
                     <div class="col-auto">
-                        <i class="fas fa-car fa-2x text-gray-300"></i>
+                        <i class="fas fa-car fa-3x text-gray-300"></i>
                     </div>
                 </div>
             </div>
-            <div class="card-footer bg-transparent
-                <a href="#" class="btn btn-sm btn-success">Ver vehículos</a>
-                <a href="#" class="btn btn-sm btn-outline-success">
+            <div class="card-footer bg-transparent py-2">
+                <a href="{% url 'vehiculos-lista' %}" class="btn btn-sm btn-success">Ver vehículos</a>
+                <a href="{% url 'vehiculo-agregar' %}" class="btn btn-sm btn-outline-success">
                     <i class="fas fa-plus"></i> Nuevo
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- Reparaciones Pendientes -->
+    <!-- Reparaciones -->
     <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-warning shadow h-100 py-2">
+        <div class="card border-left-warning shadow h-100">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                            Reparaciones Pendientes</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ reparaciones_pendientes|intcomma }}</div>
+                            Reparaciones</div>
+                        <div class="h2 mb-1">{{ total_reparaciones|intcomma }}</div>
+                        <div class="d-flex">
+                            <div class="me-3">
+                                <span class="badge bg-success">{{ reparaciones_completadas }} Completadas</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-warning">{{ reparaciones_pendientes }} Pendientes</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-auto">
-                        <i class="fas fa-tools fa-2x text-gray-300"></i>
+                        <i class="fas fa-tools fa-3x text-gray-300"></i>
                     </div>
                 </div>
             </div>
-            <div class="card-footer bg-transparent">
+            <div class="card-footer bg-transparent py-2">
                 <a href="#" class="btn btn-sm btn-warning">Ver reparaciones</a>
+                <a href="#" class="btn btn-sm btn-outline-warning">
+                    <i class="fas fa-plus"></i> Nueva
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Citas Hoy -->
+    <!-- Ingresos -->
     <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-info shadow h-100 py-2">
+        <div class="card border-left-info shadow h-100">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                            Citas para hoy</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ citas_hoy.count|intcomma }}</div>
+                            Ingresos Totales</div>
+                        <div class="h2 mb-1">${{ ingresos_totales|intcomma }}</div>
+                        <div class="text-xs">
+                            {% if tiempo_promedio %}
+                            <span class="text-muted">Tiempo promedio: {{ tiempo_promedio.days }} días</span>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="col-auto">
-                        <i class="fas fa-calendar-day fa-2x text-gray-300"></i>
+                        <i class="fas fa-dollar-sign fa-3x text-gray-300"></i>
                     </div>
                 </div>
             </div>
-            <div class="card-footer bg-transparent">
-                <a href="#" class="btn btn-sm btn-info text-white">Ver citas</a>
+            <div class="card-footer bg-transparent py-2">
+                <a href="#" class="btn btn-sm btn-info text-white">Ver reportes</a>
                 <a href="#" class="btn btn-sm btn-outline-info">
-                    <i class="fas fa-plus"></i> Nueva cita
+                    <i class="fas fa-download"></i> Exportar
                 </a>
             </div>
         </div>
@@ -108,44 +157,88 @@
 <div class="row mb-4">
     <!-- Gráfico de Reparaciones por Estado -->
     <div class="col-lg-8 mb-4">
-        <div class="card shadow mb-4">
-            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                <h6 class="m-0 font-weight-bold text-primary">Estado de Reparaciones</h6>
-                <div class="dropdown no-arrow">
-                    <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuLink">
-                        <li><a class="dropdown-item" href="#">Ver todas las reparaciones</a></li>
-                        <li><a class="dropdown-item" href="#">Exportar a Excel</a></li>
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-pie me-2"></i>Estado de Reparaciones
+                </h6>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-list me-2"></i>Ver todas</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-file-export me-2"></i>Exportar</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configuración</a></li>
                     </ul>
                 </div>
             </div>
             <div class="card-body">
-                <div class="chart-pie pt-4 pb-2">
-                    <canvas id="reparacionesChart"></canvas>
-                </div>
-                <div class="mt-4 text-center small">
-                    {% for item in reparaciones_por_estado %}
-                    <span class="me-3">
-                        <i class="fas fa-circle {% if item.estado == 'Pendiente' %}text-warning{% elif item.estado == 'En Proceso' %}text-info{% elif item.estado == 'Completada' %}text-success{% else %}text-danger{% endif %}"></i> {{ item.estado }}
-                    </span>
-                    {% endfor %}
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="chart-pie pt-4 pb-2">
+                            <canvas id="reparacionesChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-center">
+                        <div class="w-100">
+                            {% for item in reparaciones_por_estado %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>
+                                        <i class="fas fa-circle me-2 {% if item.estado == 'Pendiente' %}text-warning{% elif item.estado == 'En Proceso' %}text-info{% elif item.estado == 'Completada' %}text-success{% else %}text-danger{% endif %}"></i>
+                                        {{ item.estado }}
+                                    </span>
+                                    <span class="fw-bold">{{ item.total }}</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar {% if item.estado == 'Pendiente' %}bg-warning{% elif item.estado == 'En Proceso' %}bg-info{% elif item.estado == 'Completada' %}bg-success{% else %}bg-danger{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {% if total_reparaciones > 0 %}{{ item.total|floatformat:0 }}{% else %}0{% endif %}%" 
+                                         aria-valuenow="{{ item.total }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Ingresos Mensuales -->
+    <!-- Ingresos y Estadísticas -->
     <div class="col-lg-4 mb-4">
-        <div class="card shadow mb-4">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Ingresos Mensuales</h6>
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-line me-2"></i>Ingresos Mensuales
+                </h6>
             </div>
             <div class="card-body">
-                <div class="chart-bar">
-                    <canvas id="ingresosChart"></canvas>
-                </div>
+                {% if ingresos_mensuales %}
+                    <div class="chart-bar">
+                        <canvas id="ingresosChart" height="200"></canvas>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Promedio mensual:</span>
+                            <span class="fw-bold">${{ promedio_mensual|floatformat:2|intcomma }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Total últimos 6 meses:</span>
+                            <span class="fw-bold">${{ total_ingresos_mensuales|floatformat:2|intcomma }}</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-line fa-3x text-gray-300 mb-3"></i>
+                        <p class="text-muted">No hay datos de ingresos disponibles</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

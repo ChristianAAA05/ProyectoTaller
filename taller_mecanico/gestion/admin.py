@@ -19,9 +19,11 @@ class CustomUserAdmin(UserAdmin):
 
 # Configuración para modelos del taller
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'telefono', 'correo_electronico', 'direccion')
-    search_fields = ('nombre', 'correo_electronico')
-    list_filter = ('nombre',)
+    list_display = ('nombre', 'apellido', 'telefono', 'correo_electronico', 'fecha_registro')
+    search_fields = ('nombre', 'apellido', 'telefono', 'correo_electronico')
+    list_filter = ('fecha_registro',)
+    readonly_fields = ('fecha_registro',)
+    date_hierarchy = 'fecha_registro'
 
 class EmpleadoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'puesto', 'telefono', 'correo_electronico')
@@ -34,9 +36,36 @@ class ServicioAdmin(admin.ModelAdmin):
     list_filter = ('nombre_servicio',)
 
 class VehiculoAdmin(admin.ModelAdmin):
-    list_display = ('marca', 'modelo', 'año', 'placa', 'cliente')
-    search_fields = ('marca', 'modelo', 'placa')
-    list_filter = ('marca', 'año')
+    list_display = ('marca', 'modelo', 'año', 'placa', 'cliente', 'get_cliente_telefono', 'get_cliente_email')
+    search_fields = (
+        'marca', 'modelo', 'placa', 
+        'cliente__nombre', 'cliente__apellido',
+        'cliente__telefono', 'cliente__correo_electronico'
+    )
+    list_filter = ('marca', 'año', 'cliente')
+    list_select_related = ('cliente',)
+    autocomplete_fields = ['cliente']
+    list_per_page = 20
+    save_on_top = True
+    
+    fieldsets = (
+        ('Información del Vehículo', {
+            'fields': ('marca', 'modelo', 'año', 'placa')
+        }),
+        ('Propietario', {
+            'fields': ('cliente',)
+        }),
+    )
+    
+    def get_cliente_telefono(self, obj):
+        return obj.cliente.telefono
+    get_cliente_telefono.short_description = 'Teléfono Cliente'
+    get_cliente_telefono.admin_order_field = 'cliente__telefono'
+    
+    def get_cliente_email(self, obj):
+        return obj.cliente.correo_electronico
+    get_cliente_email.short_description = 'Email Cliente'
+    get_cliente_email.admin_order_field = 'cliente__correo_electronico'
 
 class ReparacionAdmin(admin.ModelAdmin):
     list_display = ('vehiculo', 'servicio', 'fecha_ingreso', 'fecha_salida', 'estado')

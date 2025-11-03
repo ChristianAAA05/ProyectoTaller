@@ -152,9 +152,20 @@ class VehiculoForm(forms.ModelForm):
 
     Permite gestionar la información de los vehículos asociados a cada cliente.
     """
+    cliente = forms.ModelChoiceField(
+        queryset=Cliente.objects.all(),
+        required=True,
+        label='Cliente',
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'cliente_select',
+            'style': 'display: none;'  # Ocultamos el select ya que usaremos el buscador
+        })
+    )
+    
     class Meta:
-        model = Vehiculo  # Modelo base para el formulario
-        fields = ['marca', 'modelo', 'año', 'placa']  # Campos incluidos
+        model = Vehiculo
+        fields = ['cliente', 'marca', 'modelo', 'año', 'placa']
 
         # Labels descriptivos para cada campo
         labels = {
@@ -168,21 +179,25 @@ class VehiculoForm(forms.ModelForm):
         widgets = {
             'marca': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ingrese la marca del vehículo'
+                'placeholder': 'Ej: Toyota, Ford, Chevrolet, etc.',
+                'required': 'required'
             }),
             'modelo': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ingrese el modelo del vehículo'
+                'placeholder': 'Ej: Corolla, F-150, Onix, etc.',
+                'required': 'required'
             }),
             'año': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'min': '1900',      # Año mínimo
-                'max': '2030',      # Año máximo
-                'placeholder': 'Ingrese el año del vehículo'
+                'min': '1900',
+                'max': '2030',
+                'placeholder': 'Año de fabricación',
+                'required': 'required'
             }),
             'placa': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ingrese la placa del vehículo',
-                'style': 'text-transform: uppercase;'  # Convertir a mayúsculas
-            })
+                'style': 'text-transform: uppercase;',
+                'required': 'required'
+            }),
         }

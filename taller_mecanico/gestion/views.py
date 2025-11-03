@@ -1,12 +1,19 @@
 from django.forms import formset_factory
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, HttpResponseRedirect
+from django.urls import reverse
+from django.views.generic import ListView
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 from rest_framework import generics, viewsets, status
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.db.models.functions import ExtractMonth, ExtractYear
+from django.db.models import Q
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 from .decorators import jefe_required, empleados_management_required, servicios_management_required
 from .forms import ClienteForm, EmpleadoForm, ServicioForm, VehiculoForm
@@ -166,18 +173,26 @@ def inicio(request):
 @login_required
 @jefe_required
 def dashboard_jefe(request):
-    """Dashboard exclusivo para el jefe del taller"""
+    """Dashboard exclusivo para el jefe del taller con estadísticas detalladas"""
     from django.utils import timezone
-    from django.db.models import Count, Q, Sum, F, Case, When, IntegerField
+    from django.db.models import Count, Q, Sum, F, Case, When, IntegerField, Avg, Max, Min
+    from django.db.models.functions import TruncMonth, TruncWeek, TruncDay
     
     # Obtener la fecha actual
     hoy = timezone.now().date()
+    inicio_mes = hoy.replace(day=1)
     
     # Estadísticas generales
     total_clientes = Cliente.objects.count()
     total_empleados = Empleado.objects.count()
     total_servicios = Servicio.objects.count()
     total_vehiculos = Vehiculo.objects.count()
+    
+    # Estadísticas de clientes
+    clientes_nuevos_este_mes = Cliente.objects.filter(
+        fecha_registro__year=hoy.year,
+        fecha_registro__month=hoy.month
+    ).count()
     
     # Reparaciones
     reparaciones = Reparacion.objects.all()
@@ -186,8 +201,22 @@ def dashboard_jefe(request):
     reparaciones_en_proceso = reparaciones.filter(estado='En Proceso').count()
     reparaciones_completadas = reparaciones.filter(estado='Completada').count()
     
+    # Estadísticas financieras
+    ingresos_totales = Reparacion.objects.filter(
+        estado='Completada'
+    ).aggregate(Sum('servicio__costo'))['servicio__costo__sum'] or 0
+    
+    # Promedio de tiempo de reparación
+    tiempo_promedio = Reparacion.objects.filter(
+        fecha_salida__isnull=False
+    ).aggregate(
+        avg_time=Avg(F('fecha_salida') - F('fecha_ingreso'))
+    )['avg_time']
+    
     # Reparaciones recientes (últimas 5)
-    reparaciones_recientes = reparaciones.select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:5]
+    reparaciones_recientes = reparaciones.select_related(
+        'vehiculo', 'vehiculo__cliente', 'servicio'
+    ).order_by('-fecha_ingreso')[:5]
     
     # Citas
     citas = Agenda.objects.all()
@@ -198,6 +227,34 @@ def dashboard_jefe(request):
     
     # Próximas citas (próximos 7 días)
     proxima_semana = hoy + timezone.timedelta(days=7)
+    proximas_citas = citas.filter(
+        fecha__range=[hoy, proxima_semana]
+    ).order_by('fecha', 'hora')[:5]
+    
+    # Estadísticas de reparaciones por estado
+    reparaciones_por_estado = reparaciones.values('estado').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    # Ingresos mensuales (últimos 6 meses)
+    ingresos_mensuales = Reparacion.objects.filter(
+        estado='Completada',
+        fecha_salida__gte=inicio_mes - timezone.timedelta(days=180)
+    ).annotate(
+        mes=TruncMonth('fecha_salida')
+    ).values('mes').annotate(
+        total=Sum('servicio__costo')
+    ).order_by('mes')
+    
+    # Vehículos más frecuentes
+    vehiculos_frecuentes = Vehiculo.objects.annotate(
+        total_reparaciones=Count('reparaciones')
+    ).order_by('-total_reparaciones')[:5]
+    
+    # Servicios más populares
+    servicios_populares = Servicio.objects.annotate(
+        total=Count('reparacion')
+    ).order_by('-total')[:5]
     citas_proximas = citas.filter(
         fecha__range=[hoy, proxima_semana]
     ).order_by('fecha', 'hora')[:10]
@@ -246,35 +303,34 @@ def dashboard_jefe(request):
         meses.append(f"{ingreso['mes']}/{ingreso['anio']}")
         ingresos.append(float(ingreso['total'] or 0))
     
+    # Calculate total and average for ingresos_mensuales
+    total_ingresos_mensuales = sum(item['total'] for item in ingresos_mensuales) if ingresos_mensuales else 0
+    promedio_mensual = total_ingresos_mensuales / len(ingresos_mensuales) if ingresos_mensuales else 0
+
     context = {
         'titulo': 'Panel del Jefe',
-        'es_jefe': True,
-        'es_encargado': False,
         'hoy': hoy,
-        
-        # Estadísticas generales
         'total_clientes': total_clientes,
+        'clientes_nuevos_este_mes': clientes_nuevos_este_mes,
         'total_empleados': total_empleados,
         'total_servicios': total_servicios,
         'total_vehiculos': total_vehiculos,
         'total_reparaciones': total_reparaciones,
-        'total_citas': total_citas,
-        
-        # Datos de reparaciones
         'reparaciones_pendientes': reparaciones_pendientes,
         'reparaciones_en_proceso': reparaciones_en_proceso,
         'reparaciones_completadas': reparaciones_completadas,
-        'reparaciones_recientes': reparaciones_recientes,
         'reparaciones_por_estado': reparaciones_por_estado,
-        
-        # Datos de citas
+        'ingresos_totales': ingresos_totales,
+        'ingresos_mensuales': ingresos_mensuales,
+        'total_ingresos_mensuales': total_ingresos_mensuales,
+        'promedio_mensual': round(promedio_mensual, 2),
+        'reparaciones_recientes': reparaciones_recientes,
         'citas_hoy': citas_hoy,
-        'citas_proximas': citas_proximas,
-        
-        # Empleados
+        'proximas_citas': proximas_citas,
+        'total_citas': total_citas,
+        'vehiculos_frecuentes': vehiculos_frecuentes,
+        'servicios_populares': servicios_populares,
         'empleados_destacados': empleados_destacados,
-        
-        # Datos para gráficos
         'meses_ingresos': meses,
         'ingresos': ingresos,
     }
@@ -743,15 +799,121 @@ def servicios_eliminar(request, pk):
 
     if request.method == 'POST':
         try:
-            nombre = servicio.nombre_servicio
             servicio.delete()
-            messages.success(request, f'Servicio "{nombre}" eliminado exitosamente.')
+            messages.success(request, 'Servicio eliminado correctamente.')
             return redirect('servicios-lista')
         except Exception as e:
             messages.error(request, f'Error al eliminar servicio: {str(e)}')
+    return render(request, 'gestion/confirmar_eliminar.html', {
+        'titulo': 'Eliminar Servicio',
+        'mensaje': f'¿Estás seguro de que deseas eliminar el servicio "{servicio.nombre}"?',
+        'url_volver': 'servicios-lista'
+    })
 
-    context = {'servicio': servicio}
-    return render(request, 'servicios_confirm_delete.html', context)
+
+@login_required
+def buscar_clientes(request):
+    """Vista para buscar clientes por nombre o apellido (AJAX)"""
+    query = request.GET.get('q', '')
+    if len(query) < 2:
+        return JsonResponse({'error': 'Ingrese al menos 2 caracteres para buscar'}, status=400)
+    
+    clientes = Cliente.objects.filter(
+        Q(nombre__icontains=query) | 
+        Q(apellido__icontains=query) |
+        Q(cedula__icontains=query)
+    ).values('id', 'nombre', 'apellido', 'cedula')[:10]
+    
+    return JsonResponse(list(clientes), safe=False)
+
+
+@login_required
+def vehiculo_agregar(request, cliente_id=None):
+    """Vista para agregar un vehículo, con o sin cliente pre-seleccionado"""
+    cliente = None
+    if cliente_id:
+        cliente = get_object_or_404(Cliente, pk=cliente_id)
+    
+    if request.method == 'POST':
+        form = VehiculoForm(request.POST)
+        if form.is_valid():
+            vehiculo = form.save(commit=False)
+            # Si se pasó un cliente_id, lo usamos en lugar del seleccionado en el formulario
+            if cliente:
+                vehiculo.cliente = cliente
+            vehiculo.save()
+            messages.success(request, 'Vehículo registrado correctamente.')
+            return redirect('vehiculos-lista')
+    else:
+        # Si hay un cliente, lo establecemos como valor inicial
+        initial = {'cliente': cliente.id} if cliente else {}
+        form = VehiculoForm(initial=initial)
+    
+    return render(request, 'gestion/vehiculo_form.html', {
+        'titulo': 'Agregar Vehículo',
+        'form': form,
+        'cliente': cliente,
+        'es_jefe': request.user.empleado.es_jefe if hasattr(request.user, 'empleado') else False,
+        'es_encargado': request.user.empleado.es_encargado if hasattr(request.user, 'empleado') else False
+    })
+
+
+@login_required
+def vehiculo_editar(request, pk):
+    """Vista para editar un vehículo existente"""
+    vehiculo = get_object_or_404(Vehiculo, pk=pk)
+    
+    if request.method == 'POST':
+        form = VehiculoForm(request.POST, instance=vehiculo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Vehículo actualizado correctamente.')
+            return redirect('vehiculos-lista')
+    else:
+        form = VehiculoForm(instance=vehiculo)
+    
+    return render(request, 'gestion/vehiculo_form.html', {
+        'titulo': 'Editar Vehículo',
+        'form': form,
+        'vehiculo': vehiculo,
+        'es_jefe': request.user.empleado.es_jefe if hasattr(request.user, 'empleado') else False,
+        'es_encargado': request.user.empleado.es_encargado if hasattr(request.user, 'empleado') else False
+    })
+
+
+@login_required
+def vehiculo_eliminar(request, pk):
+    """Vista para eliminar un vehículo"""
+    vehiculo = get_object_or_404(Vehiculo, pk=pk)
+    if request.method == 'POST':
+        vehiculo.delete()
+        messages.success(request, 'Vehículo eliminado correctamente.')
+        return redirect('vehiculos-lista')
+    return render(request, 'gestion/confirmar_eliminar.html', {
+        'titulo': 'Eliminar Vehículo',
+        'mensaje': f'¿Estás seguro de que deseas eliminar el vehículo con placa "{vehiculo.placa}"?',
+        'url_volver': 'vehiculos-lista'
+    })
+
+
+@login_required
+@servicios_management_required
+def servicios_eliminar(request, pk):
+    """Eliminar servicio"""
+    servicio = get_object_or_404(Servicio, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            servicio.delete()
+            messages.success(request, 'Servicio eliminado correctamente.')
+            return redirect('servicios-lista')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar servicio: {str(e)}')
+    return render(request, 'gestion/confirmar_eliminar.html', {
+        'titulo': 'Eliminar Servicio',
+        'mensaje': f'¿Estás seguro de que deseas eliminar el servicio "{servicio.nombre}"?',
+        'url_volver': 'servicios-lista'
+    })
 
 # --- Funciones de utilidad para permisos ---
 
@@ -778,11 +940,46 @@ def puede_gestionar_servicios(user):
     """Verifica si el usuario puede gestionar servicios (agregar/editar/eliminar)"""
     return es_jefe(user)
 
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import SessionAuthentication
+
+# --- Vistas basadas en clases ---
+
+@method_decorator(login_required, name='dispatch')
+class VehiculoListView(ListView):
+    """
+    Vista basada en clase para mostrar la lista de vehículos con búsqueda y paginación.
+    """
+    model = Vehiculo
+    template_name = 'gestion/vehiculo_list.html'
+    context_object_name = 'vehiculos'
+    paginate_by = 10
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Filtrar por búsqueda si se proporciona
+        search_query = self.request.GET.get('q', '')
+        if search_query:
+            queryset = queryset.filter(
+                Q(placa__icontains=search_query) |
+                Q(marca__icontains=search_query) |
+                Q(modelo__icontains=search_query) |
+                Q(cliente__nombre__icontains=search_query) |
+                Q(cliente__apellido__icontains=login_required)
+            )
+        return queryset.select_related('cliente')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Lista de Vehículos'
+        context['es_jefe'] = self.request.user.empleado.es_jefe if hasattr(self.request.user, 'empleado') else False
+        context['es_encargado'] = self.request.user.empleado.es_encargado if hasattr(self.request.user, 'empleado') else False
+        return context
+
 
 class APIAuthenticationMixin:
-    """Mixin para agregar autenticación a las vistas de API"""
+    """
+    Mixin para agregar autenticación a las vistas de API.
+    Asegura que solo los usuarios autenticados puedan acceder a las vistas.
+    """
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
