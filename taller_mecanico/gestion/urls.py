@@ -43,6 +43,10 @@ urlpatterns = [
     # Dashboard para el encargado
     path('dashboard-encargado/', views.dashboard_encargado, name='dashboard_encargado'),
     
+    # Dashboard de reparaciones
+    path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
+    path('reparaciones/nueva/', views.crear_reparacion, name='crear_reparacion'),
+    
     # ========== URLS DE API REST ==========
     # URLs automáticas para operaciones CRUD usando Django REST Framework
     # Estas URLs siguen el patrón REST: GET, POST, PUT, DELETE

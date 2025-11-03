@@ -95,9 +95,12 @@
     <!-- Reparaciones -->
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-left-warning shadow h-100">
-            <div class="card-body">
+            <div class="card-body position-relative">
+                <div class="position-absolute top-0 end-0 p-3">
+                    <i class="fas fa-tools fa-2x text-gray-300"></i>
+                </div>
                 <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
+                    <div class="col-12">
                         <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
                             Reparaciones</div>
                         <div class="h2 mb-1">{{ total_reparaciones|intcomma }}</div>
@@ -110,14 +113,11 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-tools fa-3x text-gray-300"></i>
-                    </div>
                 </div>
             </div>
             <div class="card-footer bg-transparent py-2">
-                <a href="#" class="btn btn-sm btn-warning">Ver reparaciones</a>
-                <a href="#" class="btn btn-sm btn-outline-warning">
+                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-sm btn-warning">Ver reparaciones</a>
+                <a href="{% url 'crear_reparacion' %}" class="btn btn-sm btn-outline-warning">
                     <i class="fas fa-plus"></i> Nueva
                 </a>
             </div>

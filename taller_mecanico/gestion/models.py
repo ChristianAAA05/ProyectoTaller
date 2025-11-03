@@ -136,11 +136,44 @@ class Reparacion(models.Model):
     Relaciona vehículos con servicios específicos y permite rastrear el estado
     y progreso de cada reparación.
     """
+    # Estados de condición del vehículo
+    CONDICION_OPCIONES = [
+        ('excelente', 'Excelente - Vehículo como nuevo, solo mantenimiento preventivo'),
+        ('bueno', 'Bueno - Desgaste leve, puede necesitar ajustes menores'),
+        ('regular', 'Regular - Desgaste notable, necesita reparaciones moderadas'),
+        ('malo', 'Malo - Desgastado, necesita reparaciones extensas'),
+        ('critico', 'Crítico - Daño estructural, posible pérdida total'),
+    ]
+    
+    # Estados de la reparación
+    ESTADO_REPARACION = [
+        ('pendiente', '🟡 Pendiente'),
+        ('en_progreso', '🔵 En Progreso'),
+        ('en_espera', '🟠 En Espera de Repuestos'),
+        ('revision', '🟣 Lista para Revisión'),
+        ('completada', '🟢 Completada'),
+        ('cancelada', '🔴 Cancelada'),
+    ]
+    
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='reparaciones')
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
     fecha_ingreso = models.DateTimeField(auto_now_add=True)  # Fecha automática de ingreso
     fecha_salida = models.DateTimeField(null=True, blank=True)  # Fecha de entrega
-    estado = models.CharField(max_length=50, default='En progreso')  # Estados: 'En progreso', 'Completado', 'Pendiente'
+    condicion_vehiculo = models.CharField(
+        max_length=20, 
+        choices=CONDICION_OPCIONES, 
+        default='regular',
+        verbose_name='Condición del Vehículo',
+        help_text="Estado general del vehículo que determina el tipo de reparación necesaria"
+    )
+    estado_reparacion = models.CharField(
+        max_length=20,
+        choices=ESTADO_REPARACION,
+        default='pendiente',
+        verbose_name='Estado de la Reparación',
+        help_text="Estado actual de la reparación"
+    )
+    notas = models.TextField(blank=True, null=True, help_text="Notas adicionales sobre la reparación")
 
     def __str__(self):
         return f"Reparación de {self.vehiculo} - {self.servicio}"

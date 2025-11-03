@@ -1,0 +1,285 @@
+{% extends 'gestion/base_dashboard.html' %}
+{% load humanize %}
+
+{% block dashboard_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Dashboard de Reparaciones</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'inicio' %}">Inicio</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Reparaciones</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="text-muted">
+        <i class="fas fa-calendar-alt me-2"></i>{{ hoy|date:"l, d F Y" }}
+    </div>
+</div>
+
+<!-- Tarjetas de Resumen -->
+<div class="row">
+    <!-- Total Reparaciones -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Reparaciones</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_reparaciones|intcomma }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tools fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reparaciones Completadas -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Completadas</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ reparaciones_completadas|intcomma }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reparaciones en Progreso -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            En Progreso</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ reparaciones_en_progreso|intcomma }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-spinner fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reparaciones Pendientes -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-danger shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Pendientes</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ reparaciones_pendientes|intcomma }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos y Estadísticas -->
+<div class="row mb-4">
+    <!-- Gráfico de Reparaciones por Estado -->
+    <div class="col-lg-8 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-pie me-2"></i>Distribución de Reparaciones
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-pie pt-4 pb-2">
+                    <canvas id="reparacionesEstadoChart"></canvas>
+                </div>
+                <div class="mt-4 text-center small">
+                    <span class="me-2">
+                        <i class="fas fa-circle text-success"></i> Completadas
+                    </span>
+                    <span class="me-2">
+                        <i class="fas fa-circle text-primary"></i> En Progreso
+                    </span>
+                    <span class="me-2">
+                        <i class="fas fa-circle text-warning"></i> Pendientes
+                    </span>
+                    <span class="me-2">
+                        <i class="fas fa-circle text-orange"></i> En Espera
+                    </span>
+                    <span class="me-2">
+                        <i class="fas fa-circle text-purple"></i> Revisión
+                    </span>
+                    <span class="me-2">
+                        <i class="fas fa-circle text-danger"></i> Canceladas
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Servicios más solicitados -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-tools me-2"></i>Servicios más solicitados
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-0">
+                    {% for servicio in servicios_mas_solicitados %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-xs">{{ servicio.nombre|truncatechars:25 }}</span>
+                            <span class="text-xs font-weight-bold">{{ servicio.total }}</span>
+                        </div>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar bg-primary" role="progressbar" 
+                                 style="width: {% widthratio servicio.total total_reparaciones 100 %}%" 
+                                 aria-valuenow="{{ servicio.total }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-3">
+                        No hay datos disponibles
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Últimas Reparaciones -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-clipboard-list me-2"></i>Últimas Reparaciones
+        </h6>
+        <a href="#" class="btn btn-sm btn-primary">
+            <i class="fas fa-plus me-1"></i> Nueva Reparación
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Vehículo</th>
+                        <th>Cliente</th>
+                        <th>Servicio</th>
+                        <th>Fecha Ingreso</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reparacion in ultimas_reparaciones %}
+                    <tr>
+                        <td>
+                            {{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}
+                            <div class="text-muted small">{{ reparacion.vehiculo.placa }}</div>
+                        </td>
+                        <td>{{ reparacion.vehiculo.cliente.nombre }} {{ reparacion.vehiculo.cliente.apellido }}</td>
+                        <td>{{ reparacion.servicio.nombre }}</td>
+                        <td>{{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if reparacion.estado_reparacion == 'completada' %}
+                                <span class="badge bg-success">🟢 Completada</span>
+                            {% elif reparacion.estado_reparacion == 'en_progreso' %}
+                                <span class="badge bg-primary">🔵 En Progreso</span>
+                            {% elif reparacion.estado_reparacion == 'pendiente' %}
+                                <span class="badge bg-warning text-dark">🟡 Pendiente</span>
+                            {% elif reparacion.estado_reparacion == 'en_espera' %}
+                                <span class="badge bg-orange">🟠 En Espera</span>
+                            {% elif reparacion.estado_reparacion == 'revision' %}
+                                <span class="badge bg-purple">🟣 Revisión</span>
+                            {% elif reparacion.estado_reparacion == 'cancelada' %}
+                                <span class="badge bg-danger">🔴 Cancelada</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ reparacion.estado_reparacion|title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="#" class="btn btn-sm btn-info" title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="#" class="btn btn-sm btn-primary" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">No hay reparaciones registradas</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Page level plugins -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Gráfico de torta para distribución de reparaciones por estado
+var ctx = document.getElementById("reparacionesEstadoChart");
+var myPieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ["Completadas", "En Progreso", "Pendientes", "En Espera", "Revisión", "Canceladas"],
+        datasets: [{
+            data: [
+                {{ reparaciones_por_estado.Completada|default:0 }}, 
+                {{ reparaciones_por_estado['En Progreso']|default:0 }}, 
+                {{ reparaciones_por_estado.Pendiente|default:0 }},
+                {{ reparaciones_por_estado['En Espera']|default:0 }},
+                {{ reparaciones_por_estado['Lista para Revisión']|default:0 }},
+                {{ reparaciones_por_estado.Cancelada|default:0 }}
+            ],
+            backgroundColor: ['#1cc88a', '#4e73df', '#f6c23e', '#fd7e14', '#6f42c1', '#e74a3b'],
+            hoverBackgroundColor: ['#17a673', '#2e59d9', '#dda20a', '#d9480f', '#5a32a3', '#be2617'],
+            hoverBorderColor: 'rgba(234, 236, 244, 1)',
+        }],
+    },
+    options: {
+        maintainAspectRatio: false,
+        tooltips: {
+            backgroundColor: "rgb(255,255,255)",
+            bodyFontColor: "#858796",
+            borderColor: '#dddfeb',
+            borderWidth: 1,
+            xPadding: 15,
+            yPadding: 15,
+            displayColors: false,
+            caretPadding: 10,
+        },
+        legend: {
+            display: false
+        },
+        cutoutPercentage: 80,
+    },
+});
+</script>
+{% endblock %}

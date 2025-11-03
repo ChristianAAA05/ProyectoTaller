@@ -18,7 +18,7 @@ Cada formulario incluye:
 """
 
 from django import forms
-from .models import Cliente, Empleado, Servicio, Vehiculo
+from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion
 
 class ClienteForm(forms.ModelForm):
     """
@@ -200,4 +200,71 @@ class VehiculoForm(forms.ModelForm):
                 'style': 'text-transform: uppercase;',
                 'required': 'required'
             }),
+        }
+
+
+class ReparacionForm(forms.ModelForm):
+    """
+    Formulario para crear y editar reparaciones en el taller.
+    
+    Permite gestionar la información de las reparaciones de vehículos,
+    incluyendo el vehículo, servicio, fechas y estado.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Personalizar el campo condición del vehículo
+        self.fields['condicion_vehiculo'].widget = forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+            'title': 'Seleccione la condición del vehículo'
+        })
+        
+        # Personalizar el campo estado de la reparación
+        self.fields['estado_reparacion'].widget = forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+            'title': 'Seleccione el estado de la reparación'
+        })
+        
+        # Personalizar el campo de notas
+        self.fields['notas'].widget = forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Ingrese notas adicionales sobre la reparación...'
+        })
+
+    class Meta:
+        model = Reparacion
+        fields = ['vehiculo', 'servicio', 'fecha_salida', 'condicion_vehiculo', 'estado_reparacion', 'notas']
+        
+        # Labels personalizados
+        labels = {
+            'vehiculo': 'Vehículo',
+            'servicio': 'Servicio',
+            'fecha_salida': 'Fecha de Salida (opcional)',
+            'condicion_vehiculo': 'Condición del Vehículo',
+            'estado_reparacion': 'Estado de la Reparación',
+            'notas': 'Notas Adicionales'
+        }
+        
+        # Widgets personalizados
+        widgets = {
+            'vehiculo': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True
+            }),
+            'servicio': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True
+            }),
+            'fecha_salida': forms.DateTimeInput(attrs={
+                'type': 'datetime-local',
+                'class': 'form-control'
+            })
+        }
+        
+        help_texts = {
+            'condicion_vehiculo': 'Seleccione la condición actual del vehículo.',
+            'estado_reparacion': 'Seleccione el estado actual de la reparación.',
+            'notas': 'Puede agregar notas adicionales sobre la reparación.'
         }
