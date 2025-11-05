@@ -68,9 +68,12 @@ class VehiculoAdmin(admin.ModelAdmin):
     get_cliente_email.admin_order_field = 'cliente__correo_electronico'
 
 class ReparacionAdmin(admin.ModelAdmin):
-    list_display = ('vehiculo', 'servicio', 'fecha_ingreso', 'fecha_salida', 'estado')
-    search_fields = ('vehiculo__marca', 'vehiculo__modelo', 'estado')
-    list_filter = ('estado', 'fecha_ingreso')
+    list_display = ('vehiculo', 'servicio', 'fecha_ingreso', 'fecha_salida', 'estado_reparacion', 'condicion_vehiculo')
+    search_fields = ('vehiculo__marca', 'vehiculo__modelo', 'estado_reparacion', 'condicion_vehiculo')
+    list_filter = ('estado_reparacion', 'condicion_vehiculo', 'fecha_ingreso')
+    list_editable = ('estado_reparacion', 'condicion_vehiculo')
+    list_select_related = ('vehiculo', 'servicio')
+    date_hierarchy = 'fecha_ingreso'
 
 class AgendaAdmin(admin.ModelAdmin):
     list_display = ('cliente', 'servicio', 'fecha', 'hora')

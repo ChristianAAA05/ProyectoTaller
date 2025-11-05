@@ -7,6 +7,37 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
+from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
+from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.forms import modelform_factory
+
+# ========== VISTAS DE REPARACIONES ==========
+# Vistas para el manejo de reparaciones
+
+@login_required
+def crear_reparacion(request):
+    """
+    Vista para crear una nueva reparación.
+    """
+    from .forms import ReparacionForm
+    
+    if request.method == 'POST':
+        form = ReparacionForm(request.POST)
+        if form.is_valid():
+            reparacion = form.save(commit=False)
+            reparacion.save()
+            messages.success(request, 'Reparación creada exitosamente.')
+            return redirect('dashboard_reparaciones')
+    else:
+        form = ReparacionForm()
+    
+    context = {
+        'titulo': 'Nueva Reparación',
+        'form': form,
+    }
+    return render(request, 'gestion/reparacion_form.html', context)
+
 from rest_framework import generics, viewsets, status
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
@@ -197,13 +228,13 @@ def dashboard_jefe(request):
     # Reparaciones
     reparaciones = Reparacion.objects.all()
     total_reparaciones = reparaciones.count()
-    reparaciones_pendientes = reparaciones.filter(estado='Pendiente').count()
-    reparaciones_en_proceso = reparaciones.filter(estado='En Proceso').count()
-    reparaciones_completadas = reparaciones.filter(estado='Completada').count()
+    reparaciones_pendientes = reparaciones.filter(estado_reparacion='pendiente').count()
+    reparaciones_en_proceso = reparaciones.filter(estado_reparacion='en_progreso').count()
+    reparaciones_completadas = reparaciones.filter(estado_reparacion='completada').count()
     
     # Estadísticas financieras
     ingresos_totales = Reparacion.objects.filter(
-        estado='Completada'
+        estado_reparacion='completada'
     ).aggregate(Sum('servicio__costo'))['servicio__costo__sum'] or 0
     
     # Promedio de tiempo de reparación
@@ -232,13 +263,13 @@ def dashboard_jefe(request):
     ).order_by('fecha', 'hora')[:5]
     
     # Estadísticas de reparaciones por estado
-    reparaciones_por_estado = reparaciones.values('estado').annotate(
+    reparaciones_por_estado = reparaciones.values('estado_reparacion').annotate(
         total=Count('id')
     ).order_by('-total')
     
     # Ingresos mensuales (últimos 6 meses)
     ingresos_mensuales = Reparacion.objects.filter(
-        estado='Completada',
+        estado_reparacion='completada',
         fecha_salida__gte=inicio_mes - timezone.timedelta(days=180)
     ).annotate(
         mes=TruncMonth('fecha_salida')
@@ -276,7 +307,7 @@ def dashboard_jefe(request):
     estados_reparacion = ['Pendiente', 'En Proceso', 'Completada', 'Cancelada']
     reparaciones_por_estado = []
     for estado in estados_reparacion:
-        count = reparaciones.filter(estado=estado).count()
+        count = reparaciones.filter(estado_reparacion=estado.lower().replace(' ', '_')).count()
         reparaciones_por_estado.append({
             'estado': estado,
             'total': count,
@@ -288,7 +319,7 @@ def dashboard_jefe(request):
     # Versión simplificada temporalmente - mostrar solo el conteo de reparaciones
     ingresos_mensuales = Reparacion.objects.filter(
         fecha_ingreso__gte=seis_meses_atras,
-        estado='Completada'
+        estado_reparacion='completada'
     ).annotate(
         mes=ExtractMonth('fecha_ingreso'),
         anio=ExtractYear('fecha_ingreso')
@@ -379,6 +410,59 @@ def dashboard_encargado(request):
     }
     
     return render(request, 'gestion/dashboard_encargado.html', context)
+
+@login_required
+def dashboard_reparaciones(request):
+    """
+    Dashboard para gestionar reparaciones en el taller.
+    Muestra estadísticas, últimas reparaciones y estado actual.
+    """
+    from django.db.models import Count, Q
+    
+    # Verificar permisos
+    if not request.user.is_authenticated or not (es_jefe(request.user) or es_encargado(request.user)):
+        return redirect('login')
+    
+    # Obtener estadísticas de reparaciones
+    reparaciones_totales = Reparacion.objects.count()
+    reparaciones_en_progreso = Reparacion.objects.filter(estado_reparacion='en_progreso').count()
+    reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
+    reparaciones_pendientes = Reparacion.objects.filter(estado_reparacion='pendiente').count()
+    
+    # Obtener las últimas 10 reparaciones
+    ultimas_reparaciones = Reparacion.objects.select_related(
+        'vehiculo', 'vehiculo__cliente', 'servicio'
+    ).order_by('-fecha_ingreso')[:10]
+    
+    # Reparaciones por estado (para gráfico)
+    reparaciones_por_estado = {
+        'Completada': Reparacion.objects.filter(estado_reparacion='completada').count(),
+        'En Progreso': Reparacion.objects.filter(estado_reparacion='en_progreso').count(),
+        'Pendiente': Reparacion.objects.filter(estado_reparacion='pendiente').count(),
+        'En Espera': Reparacion.objects.filter(estado_reparacion='en_espera').count(),
+        'Lista para Revisión': Reparacion.objects.filter(estado_reparacion='revision').count(),
+        'Cancelada': Reparacion.objects.filter(estado_reparacion='cancelada').count()
+    }
+    
+    # Servicios más solicitados
+    servicios_mas_solicitados = Servicio.objects.annotate(
+        total=Count('reparacion')
+    ).order_by('-total')[:5]
+    
+    context = {
+        'titulo': 'Dashboard de Reparaciones',
+        'total_reparaciones': total_reparaciones,
+        'reparaciones_completadas': reparaciones_completadas,
+        'reparaciones_en_progreso': reparaciones_en_progreso,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'ultimas_reparaciones': ultimas_reparaciones,
+        'reparaciones_por_estado': reparaciones_por_estado,
+        'servicios_mas_solicitados': servicios_mas_solicitados,
+        'es_jefe': es_jefe(request.user),
+        'es_encargado': True
+    }
+    
+    return render(request, 'gestion/dashboard_reparaciones.html', context)
 
 @login_required
 def dashboard_cliente(request):
