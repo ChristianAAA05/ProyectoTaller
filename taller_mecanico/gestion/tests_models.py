@@ -1,13 +1,24 @@
 from django.test import TestCase
 from django.utils import timezone
 from datetime import date, time, timedelta
-from .models import Cliente, Empleado, Servicio, Agenda, Registro
+from gestion.models import Cliente, Empleado, Servicio, Agenda, Registro
 from django.core.exceptions import ValidationError
 
 class AgendaRegistroTestCase(TestCase):
     def setUp(self):
-        self.cliente = Cliente.objects.create(nombre="Cliente Test", telefono="12345678")
-        self.empleado = Empleado.objects.create(nombre="Empleado Test", puesto="Mecánico", telefono="87654321")
+        self.cliente = Cliente.objects.create(
+            nombre="Cliente Test",
+            apellido="Prueba",
+            telefono="12345678",
+            direccion="Calle Falsa 123",
+            correo_electronico="cliente_test@example.com"
+        )
+        self.empleado = Empleado.objects.create(
+            nombre="Empleado Test",
+            puesto="Mecánico",
+            telefono="87654321",
+            correo_electronico="empleado_test@example.com"
+        )
         self.servicio = Servicio.objects.create(nombre_servicio="Cambio de aceite", duracion=30, costo=50)
 
     def test_programar_cita_exitosa(self):

@@ -3,147 +3,569 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import ListView
-from django.contrib.auth import authenticate, login, logout
+from django.core.exceptions import ValidationError
+from django.db.models import Count, Q, Sum
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
-from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
-from django.urls import reverse_lazy
-from django.utils.decorators import method_decorator
-from django.forms import modelform_factory
+from django.forms import modelformset_factory, formset_factory, inlineformset_factory
+from django.db import transaction
+from django.utils import timezone
+from datetime import datetime, time as dt_time, timedelta
+from django.db.models.functions import TruncMonth
 
-# ========== VISTAS DE REPARACIONES ==========
-# Vistas para el manejo de reparaciones
+from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
+from .forms import ClienteForm, VehiculoForm, EmpleadoForm, ServicioForm, ReparacionForm, CitaForm
+from .decorators import es_jefe, es_encargado, puede_gestionar_empleados, puede_gestionar_servicios
 
-@login_required
-def crear_reparacion(request):
-    """
-    Vista para crear una nueva reparación.
-    """
-    from .forms import ReparacionForm
-    
-    if request.method == 'POST':
-        form = ReparacionForm(request.POST)
-        if form.is_valid():
-            reparacion = form.save(commit=False)
-            reparacion.save()
-            messages.success(request, 'Reparación creada exitosamente.')
-            return redirect('dashboard_reparaciones')
-    else:
-        form = ReparacionForm()
-    
-    context = {
-        'titulo': 'Nueva Reparación',
-        'form': form,
-    }
-    return render(request, 'gestion/reparacion_form.html', context)
-
+# Importaciones para la API REST
 from rest_framework import generics, viewsets, status
 from rest_framework.response import Response
-from django.core.exceptions import ValidationError
-from django.db.models.functions import ExtractMonth, ExtractYear
-from django.db.models import Q
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.permissions import IsAuthenticated
+from .serializers import *
 
-from .decorators import jefe_required, empleados_management_required, servicios_management_required
-from .forms import ClienteForm, EmpleadoForm, ServicioForm, VehiculoForm
-from .models import (
-    Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
-)
-from .serializers import (
-    ClienteSerializer, EmpleadoSerializer, ServicioSerializer,
-    VehiculoSerializer, ReparacionSerializer, AgendaSerializer, RegistroSerializer
-)
+# Funciones de ayuda para permisos
+def es_jefe_o_encargado(user):
+    """Verifica si el usuario es jefe o encargado"""
+    return user.is_authenticated and (user.is_staff or hasattr(user, 'profile') and user.profile.es_empleado)
 
-# Create your views here.
-
-# --- Vistas de Autenticación ---
+# ========== AUTENTICACIÓN Y DASHBOARD BÁSICOS ==========
 
 def login_view(request):
-    """Vista de login personalizado"""
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        
         user = authenticate(request, username=username, password=password)
-        
         if user is not None:
             login(request, user)
-            messages.success(request, f'¡Bienvenido, {user.username}!')
-            
-            # Redirigir según el tipo de usuario
-            if hasattr(user, 'profile') and user.profile.es_empleado:
-                return redirect('inicio')
-            else:
-                return redirect('inicio')
-        else:
-            messages.error(request, 'Usuario o contraseña incorrectos.')
-    
+            messages.success(request, 'Inicio de sesión exitoso.')
+            return redirect('inicio')
+        messages.error(request, 'Usuario o contraseña incorrectos.')
     return render(request, 'auth/login.html')
 
 
+@login_required
 def logout_view(request):
-    """Vista de logout"""
     logout(request)
-    messages.info(request, 'Has cerrado sesión exitosamente.')
+    messages.info(request, 'Has cerrado sesión.')
     return redirect('login')
 
 
 @login_required
 def perfil_view(request):
-    """Vista de perfil de usuario"""
     return render(request, 'auth/perfil.html', {'user': request.user})
 
 
-# --- Vistas de la API ---
+@login_required
+def inicio(request):
+    # Redirigir a panel del jefe si corresponde
+    if es_jefe(request.user):
+        return redirect('dashboard_jefe')
+    total_clientes = Cliente.objects.count()
+    total_empleados = Empleado.objects.count()
+    total_servicios = Servicio.objects.count()
+    total_vehiculos = Vehiculo.objects.count()
+    reparaciones_pendientes = Reparacion.objects.filter(estado_reparacion='en_progreso').count()
+    citas_hoy = Agenda.objects.filter(fecha=timezone.now().date()).count()
+    context = {
+        'total_clientes': total_clientes,
+        'total_empleados': total_empleados,
+        'total_servicios': total_servicios,
+        'total_vehiculos': total_vehiculos,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'citas_hoy': citas_hoy,
+    }
+    return render(request, 'inicio.html', context)
+
+
+# Vista temporal para otras rutas aún no implementadas
+@login_required
+def not_implemented_view(request, *args, **kwargs):
+    messages.info(request, 'Funcionalidad en desarrollo.')
+    return redirect('inicio')
+
+# Alias temporales para dashboards aún no implementados
+dashboard_encargado = not_implemented_view
+
+
+@login_required
+def buscar_clientes(request):
+    q = request.GET.get('q', '').strip()
+    clientes = Cliente.objects.all()
+    if q:
+        clientes = clientes.filter(
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(correo_electronico__icontains=q) |
+            Q(telefono__icontains=q)
+        )
+    results = []
+    for c in clientes[:10]:
+        results.append({
+            'id': c.id,
+            'nombre': c.nombre,
+            'apellido': c.apellido,
+            'telefono': c.telefono,
+            'correo_electronico': c.correo_electronico,
+            # Campo alias para compatibilidad con template de vehículos
+            'cedula': c.telefono or ''
+        })
+    # Devolver en dos formatos por compatibilidad con distintos JS en templates
+    return JsonResponse({'results': results, 'clientes': results})
+
+# ========== DASHBOARD JEFE ==========
+
+@login_required
+def dashboard_jefe(request):
+    hoy = timezone.now().date()
+
+    total_clientes = Cliente.objects.count()
+    total_vehiculos = Vehiculo.objects.count()
+    total_reparaciones = Reparacion.objects.count()
+    total_servicios = Servicio.objects.count()
+    reparaciones_pendientes = Reparacion.objects.filter(
+        estado_reparacion__in=['pendiente', 'en_progreso', 'en_espera', 'revision']
+    ).count()
+    reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
+    citas_hoy_count = Agenda.objects.filter(fecha=hoy).count()
+    clientes_nuevos_este_mes = Cliente.objects.filter(
+        fecha_registro__year=hoy.year,
+        fecha_registro__month=hoy.month
+    ).count()
+
+    # Vehículos con más reparaciones en últimos 30 días
+    desde = hoy - timedelta(days=30)
+    vehiculos_frecuentes = Vehiculo.objects.annotate(
+        num_reparaciones=Count('reparaciones', filter=Q(reparaciones__fecha_ingreso__gte=desde))
+    ).order_by('-num_reparaciones')[:5]
+
+    # Reparaciones por estado (para gráfico)
+    estado_map = {
+        'pendiente': 'Pendiente',
+        'en_progreso': 'En Proceso',
+        'en_espera': 'En Espera',
+        'revision': 'Para Revisión',
+        'completada': 'Completada',
+        'cancelada': 'Cancelada',
+    }
+    rep_estados_qs = Reparacion.objects.values('estado_reparacion').annotate(total=Count('id'))
+    reparaciones_por_estado = [
+        {
+            'estado': estado_map.get(item['estado_reparacion'], item['estado_reparacion']),
+            'total': item['total']
+        }
+        for item in rep_estados_qs
+    ]
+
+    # Ingresos mensuales (suma de costo del servicio por mes) - últimos 6 meses
+    ingresos_qs = (Reparacion.objects
+                   .annotate(m=TruncMonth('fecha_ingreso'))
+                   .values('m')
+                   .annotate(total=Sum('servicio__costo'))
+                   .order_by('m'))
+    ingresos_totales_agg = Reparacion.objects.aggregate(total=Sum('servicio__costo'))
+    ingresos_totales = float(ingresos_totales_agg['total'] or 0)
+    meses_all = [item['m'].strftime('%b %Y') if item['m'] else '' for item in ingresos_qs]
+    ingresos_all = [float(item['total']) if item['total'] is not None else 0.0 for item in ingresos_qs]
+    meses = meses_all[-6:]
+    ingresos = ingresos_all[-6:]
+    total_ingresos_mensuales = sum(ingresos) if ingresos else 0.0
+    promedio_mensual = (total_ingresos_mensuales / len(ingresos)) if ingresos else None
+
+    # Tiempo promedio de reparación (en días) para completadas
+    completadas = Reparacion.objects.filter(fecha_salida__isnull=False)
+    if completadas.exists():
+        duraciones = [(r.fecha_salida - r.fecha_ingreso).days for r in completadas]
+        avg_days = sum(duraciones) / len(duraciones) if duraciones else 0
+        # Representar como timedelta
+        from datetime import timedelta as _td
+        tiempo_promedio = _td(days=int(round(avg_days)))
+    else:
+        tiempo_promedio = None
+
+    # Listas para secciones
+    reparaciones_recientes = Reparacion.objects.select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:10]
+    citas_proximas = Agenda.objects.select_related('cliente', 'servicio').filter(fecha__gte=hoy).order_by('fecha', 'hora')[:10]
+
+    # Empleados destacados por registros (últimos 30 días)
+    top_registros = (Registro.objects
+                     .filter(fecha__gte=desde)
+                     .values('empleado__id', 'empleado__nombre', 'empleado__puesto')
+                     .annotate(num_reparaciones=Count('id'))
+                     .order_by('-num_reparaciones')[:4])
+    empleados_destacados = [
+        {
+            'nombre': r['empleado__nombre'],
+            'puesto': r['empleado__puesto'],
+            'num_reparaciones': r['num_reparaciones'],
+        }
+        for r in top_registros
+    ]
+
+    context = {
+        'titulo': 'Panel del Jefe',
+        'hoy': timezone.now(),
+        'total_clientes': total_clientes,
+        'total_vehiculos': total_vehiculos,
+        'total_servicios': total_servicios,
+        'total_reparaciones': total_reparaciones,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'reparaciones_completadas': reparaciones_completadas,
+        'citas_hoy_count': citas_hoy_count,
+        'clientes_nuevos_este_mes': clientes_nuevos_este_mes,
+        'vehiculos_frecuentes': vehiculos_frecuentes,
+        'reparaciones_por_estado': reparaciones_por_estado,
+        'ingresos_mensuales': bool(ingresos),
+        'meses': meses,
+        'ingresos': ingresos,
+        'ingresos_totales': ingresos_totales,
+        'promedio_mensual': promedio_mensual,
+        'total_ingresos_mensuales': total_ingresos_mensuales,
+        'reparaciones_recientes': reparaciones_recientes,
+        'citas_proximas': citas_proximas,
+        'empleados_destacados': empleados_destacados,
+        'tiempo_promedio': tiempo_promedio,
+    }
+    return render(request, 'gestion/dashboard_jefe.html', context)
+
+# ========== DASHBOARD REPARACIONES Y CRUD ==========
+
+@login_required
+def dashboard_reparaciones(request):
+    hoy = timezone.now()
+
+    total_reparaciones = Reparacion.objects.count()
+    reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
+    reparaciones_en_progreso = Reparacion.objects.filter(estado_reparacion='en_progreso').count()
+    reparaciones_pendientes = Reparacion.objects.filter(estado_reparacion='pendiente').count()
+    reparaciones_en_espera = Reparacion.objects.filter(estado_reparacion='en_espera').count()
+    reparaciones_revision = Reparacion.objects.filter(estado_reparacion='revision').count()
+    reparaciones_canceladas = Reparacion.objects.filter(estado_reparacion='cancelada').count()
+
+    # Dict para el gráfico del template
+    reparaciones_por_estado = {
+        'Completada': reparaciones_completadas,
+        'En_Progreso': reparaciones_en_progreso,
+        'Pendiente': reparaciones_pendientes,
+        'En_Espera': reparaciones_en_espera,
+        'Lista_para_Revisión': reparaciones_revision,
+        'Cancelada': reparaciones_canceladas,
+    }
+
+    # Servicios más solicitados
+    servicios_qs = (Reparacion.objects
+                    .values('servicio__nombre_servicio')
+                    .annotate(total=Count('id'))
+                    .order_by('-total')[:5])
+    servicios_mas_solicitados = [
+        {'nombre': s['servicio__nombre_servicio'], 'total': s['total']}
+        for s in servicios_qs
+    ]
+
+    ultimas_reparaciones = (Reparacion.objects
+                            .select_related('vehiculo', 'servicio', 'vehiculo__cliente')
+                            .order_by('-fecha_ingreso')[:10])
+
+    context = {
+        'hoy': hoy,
+        'total_reparaciones': total_reparaciones,
+        'reparaciones_completadas': reparaciones_completadas,
+        'reparaciones_en_progreso': reparaciones_en_progreso,
+        'reparaciones_pendientes': reparaciones_pendientes,
+        'reparaciones_por_estado': reparaciones_por_estado,
+        'servicios_mas_solicitados': servicios_mas_solicitados,
+        'ultimas_reparaciones': ultimas_reparaciones,
+    }
+    return render(request, 'gestion/dashboard_reparaciones.html', context)
+
+
+@login_required
+def crear_reparacion(request):
+    titulo = 'Nueva Reparación'
+    if request.method == 'POST':
+        form = ReparacionForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Reparación creada correctamente.')
+            return redirect('dashboard_reparaciones')
+    else:
+        form = ReparacionForm()
+    return render(request, 'gestion/reparacion_form.html', {'form': form, 'titulo': titulo})
+
+
+@login_required
+def editar_reparacion(request, pk):
+    reparacion = get_object_or_404(Reparacion, pk=pk)
+    titulo = 'Editar Reparación'
+    if request.method == 'POST':
+        form = ReparacionForm(request.POST, instance=reparacion)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Reparación actualizada correctamente.')
+            return redirect('dashboard_reparaciones')
+    else:
+        form = ReparacionForm(instance=reparacion)
+    return render(request, 'gestion/reparacion_form.html', {'form': form, 'titulo': titulo})
+
+
+@login_required
+def eliminar_reparacion(request, pk):
+    reparacion = get_object_or_404(Reparacion, pk=pk)
+    if request.method == 'POST':
+        reparacion.delete()
+        messages.success(request, 'Reparación eliminada correctamente.')
+        return redirect('dashboard_reparaciones')
+    return render(request, 'gestion/reparacion_confirm_delete.html', {'reparacion': reparacion})
+
+# ========== CLIENTES (CRUD con templates) ==========
+
+@login_required
+def clientes_lista(request):
+    clientes = Cliente.objects.prefetch_related('vehiculos').order_by('nombre', 'apellido')
+    return render(request, 'clientes_lista.html', {'clientes': clientes})
+
+
+@login_required
+@transaction.atomic
+def clientes_crear(request):
+    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa'], extra=1, can_delete=True)
+    if request.method == 'POST':
+        form = ClienteForm(request.POST)
+        formset = VehiculoFormSet(request.POST, prefix='vehiculos')
+        if form.is_valid() and formset.is_valid():
+            cliente = form.save()
+            formset.instance = cliente
+            formset.save()
+            messages.success(request, 'Cliente creado correctamente.')
+            return redirect('clientes-lista')
+    else:
+        form = ClienteForm()
+        formset = VehiculoFormSet(prefix='vehiculos')
+    return render(request, 'clientes_form.html', {'form': form, 'formset': formset, 'accion': 'Crear'})
+
+
+@login_required
+@transaction.atomic
+def clientes_editar(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa'], extra=0, can_delete=True)
+    if request.method == 'POST':
+        form = ClienteForm(request.POST, instance=cliente)
+        formset = VehiculoFormSet(request.POST, instance=cliente, prefix='vehiculos')
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            messages.success(request, 'Cliente actualizado correctamente.')
+            return redirect('clientes-lista')
+    else:
+        form = ClienteForm(instance=cliente)
+        formset = VehiculoFormSet(instance=cliente, prefix='vehiculos')
+    return render(request, 'clientes_form.html', {'form': form, 'formset': formset, 'accion': 'Editar'})
+
+
+@login_required
+def clientes_eliminar(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    if request.method == 'POST':
+        cliente.delete()
+        messages.success(request, 'Cliente eliminado correctamente.')
+        return redirect('clientes-lista')
+    return render(request, 'clientes_confirm_delete.html', {'cliente': cliente})
+
+
+# ========== EMPLEADOS (CRUD con templates) ==========
+
+@login_required
+def empleados_lista(request):
+    empleados = Empleado.objects.all().order_by('nombre')
+    return render(request, 'empleados_lista.html', {'empleados': empleados})
+
+
+@login_required
+def empleados_crear(request):
+    if request.method == 'POST':
+        form = EmpleadoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Empleado creado correctamente.')
+            return redirect('empleados-lista')
+    else:
+        form = EmpleadoForm()
+    return render(request, 'empleados_form.html', {'form': form, 'accion': 'Crear'})
+
+
+@login_required
+def empleados_editar(request, pk):
+    empleado = get_object_or_404(Empleado, pk=pk)
+    if request.method == 'POST':
+        form = EmpleadoForm(request.POST, instance=empleado)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Empleado actualizado correctamente.')
+            return redirect('empleados-lista')
+    else:
+        form = EmpleadoForm(instance=empleado)
+    return render(request, 'empleados_form.html', {'form': form, 'accion': 'Editar'})
+
+
+@login_required
+def empleados_eliminar(request, pk):
+    empleado = get_object_or_404(Empleado, pk=pk)
+    if request.method == 'POST':
+        empleado.delete()
+        messages.success(request, 'Empleado eliminado correctamente.')
+        return redirect('empleados-lista')
+    return render(request, 'empleados_confirm_delete.html', {'empleado': empleado})
+
+
+# ========== SERVICIOS (CRUD con templates) ==========
+
+@login_required
+def servicios_lista(request):
+    servicios = Servicio.objects.all().order_by('nombre_servicio')
+    return render(request, 'servicios_lista.html', {'servicios': servicios})
+
+
+@login_required
+def servicios_crear(request):
+    if request.method == 'POST':
+        form = ServicioForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Servicio creado correctamente.')
+            return redirect('servicios-lista')
+    else:
+        form = ServicioForm()
+    return render(request, 'servicios_form.html', {'form': form, 'accion': 'Crear'})
+
+
+@login_required
+def servicios_editar(request, pk):
+    servicio = get_object_or_404(Servicio, pk=pk)
+    if request.method == 'POST':
+        form = ServicioForm(request.POST, instance=servicio)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Servicio actualizado correctamente.')
+            return redirect('servicios-lista')
+    else:
+        form = ServicioForm(instance=servicio)
+    return render(request, 'servicios_form.html', {'form': form, 'accion': 'Editar'})
+
+
+@login_required
+def servicios_eliminar(request, pk):
+    servicio = get_object_or_404(Servicio, pk=pk)
+    if request.method == 'POST':
+        servicio.delete()
+        messages.success(request, 'Servicio eliminado correctamente.')
+        return redirect('servicios-lista')
+    return render(request, 'servicios_confirm_delete.html', {'servicio': servicio})
+
+
+# ========== VEHÍCULOS (crear/editar/eliminar con template) ==========
+
+@login_required
+def vehiculo_agregar(request, cliente_id=None):
+    titulo = 'Agregar Vehículo'
+    cliente = None
+    if cliente_id:
+        cliente = get_object_or_404(Cliente, pk=cliente_id)
+    if request.method == 'POST':
+        form = VehiculoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Vehículo agregado correctamente.')
+            return redirect('vehiculos-lista')
+    else:
+        form = VehiculoForm(initial={'cliente': cliente.id} if cliente else None)
+    return render(request, 'gestion/vehiculo_form.html', {'form': form, 'titulo': titulo, 'cliente': cliente})
+
+
+@login_required
+def vehiculo_editar(request, pk):
+    vehiculo = get_object_or_404(Vehiculo, pk=pk)
+    titulo = 'Editar Vehículo'
+    if request.method == 'POST':
+        form = VehiculoForm(request.POST, instance=vehiculo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Vehículo actualizado correctamente.')
+            return redirect('vehiculos-lista')
+    else:
+        form = VehiculoForm(instance=vehiculo)
+    return render(request, 'gestion/vehiculo_form.html', {'form': form, 'titulo': titulo, 'cliente': vehiculo.cliente})
+
+
+@login_required
+def vehiculo_eliminar(request, pk):
+    vehiculo = get_object_or_404(Vehiculo, pk=pk)
+    if request.method == 'POST':
+        vehiculo.delete()
+        messages.success(request, 'Vehículo eliminado correctamente.')
+        return redirect('vehiculos-lista')
+    return render(request, 'vehiculos_confirm_delete.html', {'vehiculo': vehiculo})
+
+# ========== API VIEWS Y VIEWSETS ==========
 
 # Cliente
 class ClienteListCreate(generics.ListCreateAPIView):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
 
+
 class ClienteRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
+
 
 # Empleado
 class EmpleadoListCreate(generics.ListCreateAPIView):
     queryset = Empleado.objects.all()
     serializer_class = EmpleadoSerializer
 
+
 class EmpleadoRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Empleado.objects.all()
     serializer_class = EmpleadoSerializer
+
 
 # Servicio
 class ServicioListCreate(generics.ListCreateAPIView):
     queryset = Servicio.objects.all()
     serializer_class = ServicioSerializer
 
+
 class ServicioRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Servicio.objects.all()
     serializer_class = ServicioSerializer
+
 
 # Vehiculo
 class VehiculoListCreate(generics.ListCreateAPIView):
     queryset = Vehiculo.objects.all()
     serializer_class = VehiculoSerializer
 
+
 class VehiculoRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Vehiculo.objects.all()
     serializer_class = VehiculoSerializer
+
 
 # Reparacion
 class ReparacionListCreate(generics.ListCreateAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
 
+
 class ReparacionRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
 
-# ViewSets con validaciones personalizadas
+
+# Agenda (citas)
 class AgendaViewSet(viewsets.ModelViewSet):
     queryset = Agenda.objects.all()
     serializer_class = AgendaSerializer
@@ -164,6 +586,7 @@ class AgendaViewSet(viewsets.ModelViewSet):
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
+# Registro (historial)
 class RegistroViewSet(viewsets.ModelViewSet):
     queryset = Registro.objects.all()
     serializer_class = RegistroSerializer
@@ -173,10 +596,10 @@ class RegistroViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             registro = Registro().crearRegistro(
-                cliente = serializer.validated_data['cliente'],
-                empleado = serializer.validated_data['empleado'],
-                servicio = serializer.validated_data['servicio'],
-                fecha = serializer.validated_data.get('fecha', None)
+                cliente=serializer.validated_data['cliente'],
+                empleado=serializer.validated_data['empleado'],
+                servicio=serializer.validated_data['servicio'],
+                fecha=serializer.validated_data.get('fecha', None)
             )
         except ValidationError as e:
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
@@ -184,850 +607,127 @@ class RegistroViewSet(viewsets.ModelViewSet):
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
-# --- Vistas basadas en plantillas ---
+# ========== VISTAS DE CITAS ==========
 
 @login_required
-def inicio(request):
-    """
-    Redirige al usuario al dashboard correspondiente según su rol.
-    """
-    if hasattr(request.user, 'profile') and request.user.profile.es_empleado:
-        # Verificar si es jefe
-        if es_jefe(request.user):
-            return redirect('dashboard_jefe')
-        # Si no es jefe, es encargado
-        return redirect('dashboard_encargado')
-    
-    # Si es cliente, redirigir al dashboard de cliente
-    return redirect('dashboard_cliente')
+def lista_citas(request):
+    """Vista para listar todas las citas"""
+    citas = Agenda.objects.select_related('cliente', 'servicio').order_by('-fecha', '-hora')
+    return render(request, 'gestion/citas/lista_citas.html', {
+        'titulo': 'Lista de Citas',
+        'citas': citas
+    })
 
 @login_required
-@jefe_required
-def dashboard_jefe(request):
-    """Dashboard exclusivo para el jefe del taller con estadísticas detalladas"""
-    from django.utils import timezone
-    from django.db.models import Count, Q, Sum, F, Case, When, IntegerField, Avg, Max, Min
-    from django.db.models.functions import TruncMonth, TruncWeek, TruncDay
+def crear_cita(request):
+    """Vista para crear una nueva cita"""
+    if request.method == 'POST':
+        form = CitaForm(request.POST)
+        if form.is_valid():
+            try:
+                cita = form.save(commit=False)
+                # Validar que la fecha no sea pasada
+                if cita.fecha < timezone.now().date():
+                    messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
+                # Validar que no haya otra cita a la misma hora
+                elif Agenda.objects.filter(fecha=cita.fecha, hora=cita.hora).exists():
+                    messages.error(request, 'Ya existe una cita programada para esa fecha y hora.')
+                else:
+                    cita.save()
+                    messages.success(request, 'Cita creada exitosamente.')
+                    return redirect('lista_citas')
+            except Exception as e:
+                messages.error(request, f'Error al crear la cita: {str(e)}')
+    else:
+        form = CitaForm()
     
-    # Obtener la fecha actual
-    hoy = timezone.now().date()
-    inicio_mes = hoy.replace(day=1)
-    
-    # Estadísticas generales
-    total_clientes = Cliente.objects.count()
-    total_empleados = Empleado.objects.count()
-    total_servicios = Servicio.objects.count()
-    total_vehiculos = Vehiculo.objects.count()
-    
-    # Estadísticas de clientes
-    clientes_nuevos_este_mes = Cliente.objects.filter(
-        fecha_registro__year=hoy.year,
-        fecha_registro__month=hoy.month
-    ).count()
-    
-    # Reparaciones
-    reparaciones = Reparacion.objects.all()
-    total_reparaciones = reparaciones.count()
-    reparaciones_pendientes = reparaciones.filter(estado_reparacion='pendiente').count()
-    reparaciones_en_proceso = reparaciones.filter(estado_reparacion='en_progreso').count()
-    reparaciones_completadas = reparaciones.filter(estado_reparacion='completada').count()
-    
-    # Estadísticas financieras
-    ingresos_totales = Reparacion.objects.filter(
-        estado_reparacion='completada'
-    ).aggregate(Sum('servicio__costo'))['servicio__costo__sum'] or 0
-    
-    # Promedio de tiempo de reparación
-    tiempo_promedio = Reparacion.objects.filter(
-        fecha_salida__isnull=False
-    ).aggregate(
-        avg_time=Avg(F('fecha_salida') - F('fecha_ingreso'))
-    )['avg_time']
-    
-    # Reparaciones recientes (últimas 5)
-    reparaciones_recientes = reparaciones.select_related(
-        'vehiculo', 'vehiculo__cliente', 'servicio'
-    ).order_by('-fecha_ingreso')[:5]
-    
-    # Citas
-    citas = Agenda.objects.all()
-    total_citas = citas.count()
-    
-    # Citas de hoy
-    citas_hoy = citas.filter(fecha=hoy).order_by('hora')
-    
-    # Próximas citas (próximos 7 días)
-    proxima_semana = hoy + timezone.timedelta(days=7)
-    proximas_citas = citas.filter(
-        fecha__range=[hoy, proxima_semana]
-    ).order_by('fecha', 'hora')[:5]
-    
-    # Estadísticas de reparaciones por estado
-    reparaciones_por_estado = reparaciones.values('estado_reparacion').annotate(
-        total=Count('id')
-    ).order_by('-total')
-    
-    # Ingresos mensuales (últimos 6 meses)
-    ingresos_mensuales = Reparacion.objects.filter(
-        estado_reparacion='completada',
-        fecha_salida__gte=inicio_mes - timezone.timedelta(days=180)
-    ).annotate(
-        mes=TruncMonth('fecha_salida')
-    ).values('mes').annotate(
-        total=Sum('servicio__costo')
-    ).order_by('mes')
-    
-    # Vehículos más frecuentes
-    vehiculos_frecuentes = Vehiculo.objects.annotate(
-        total_reparaciones=Count('reparaciones')
-    ).order_by('-total_reparaciones')[:5]
-    
-    # Servicios más populares
-    servicios_populares = Servicio.objects.annotate(
-        total=Count('reparacion')
-    ).order_by('-total')[:5]
-    citas_proximas = citas.filter(
-        fecha__range=[hoy, proxima_semana]
-    ).order_by('fecha', 'hora')[:10]
-    
-    # Empleados destacados (versión simplificada temporalmente)
-    # Primero obtenemos todos los empleados
-    empleados_destacados = Empleado.objects.all()[:5]  # Mostrar primeros 5 empleados
-    
-    # Agregamos manualmente el conteo de reparaciones
-    desde = timezone.now() - timezone.timedelta(days=30)
-    for empleado in empleados_destacados:
-        # Contar registros de este empleado en el último mes
-        empleado.num_reparaciones = Registro.objects.filter(
-            empleado=empleado,
-            fecha__gte=desde
-        ).count()
-    
-    # Reparaciones por estado (para gráfico)
-    estados_reparacion = ['Pendiente', 'En Proceso', 'Completada', 'Cancelada']
-    reparaciones_por_estado = []
-    for estado in estados_reparacion:
-        count = reparaciones.filter(estado_reparacion=estado.lower().replace(' ', '_')).count()
-        reparaciones_por_estado.append({
-            'estado': estado,
-            'total': count,
-            'porcentaje': round((count / total_reparaciones * 100) if total_reparaciones > 0 else 0, 1)
-        })
-    
-    # Ingresos mensuales (últimos 6 meses)
-    seis_meses_atras = hoy - timezone.timedelta(days=180)
-    # Versión simplificada temporalmente - mostrar solo el conteo de reparaciones
-    ingresos_mensuales = Reparacion.objects.filter(
-        fecha_ingreso__gte=seis_meses_atras,
-        estado_reparacion='completada'
-    ).annotate(
-        mes=ExtractMonth('fecha_ingreso'),
-        anio=ExtractYear('fecha_ingreso')
-    ).values('anio', 'mes').annotate(
-        total=Count('id')
-    ).order_by('anio', 'mes')
-    
-    # Preparar datos para la gráfica de ingresos
-    meses = []
-    ingresos = []
-    for ingreso in ingresos_mensuales:
-        meses.append(f"{ingreso['mes']}/{ingreso['anio']}")
-        ingresos.append(float(ingreso['total'] or 0))
-    
-    # Calculate total and average for ingresos_mensuales
-    total_ingresos_mensuales = sum(item['total'] for item in ingresos_mensuales) if ingresos_mensuales else 0
-    promedio_mensual = total_ingresos_mensuales / len(ingresos_mensuales) if ingresos_mensuales else 0
-
-    context = {
-        'titulo': 'Panel del Jefe',
-        'hoy': hoy,
-        'total_clientes': total_clientes,
-        'clientes_nuevos_este_mes': clientes_nuevos_este_mes,
-        'total_empleados': total_empleados,
-        'total_servicios': total_servicios,
-        'total_vehiculos': total_vehiculos,
-        'total_reparaciones': total_reparaciones,
-        'reparaciones_pendientes': reparaciones_pendientes,
-        'reparaciones_en_proceso': reparaciones_en_proceso,
-        'reparaciones_completadas': reparaciones_completadas,
-        'reparaciones_por_estado': reparaciones_por_estado,
-        'ingresos_totales': ingresos_totales,
-        'ingresos_mensuales': ingresos_mensuales,
-        'total_ingresos_mensuales': total_ingresos_mensuales,
-        'promedio_mensual': round(promedio_mensual, 2),
-        'reparaciones_recientes': reparaciones_recientes,
-        'citas_hoy': citas_hoy,
-        'proximas_citas': proximas_citas,
-        'total_citas': total_citas,
-        'vehiculos_frecuentes': vehiculos_frecuentes,
-        'servicios_populares': servicios_populares,
-        'empleados_destacados': empleados_destacados,
-        'meses_ingresos': meses,
-        'ingresos': ingresos,
-    }
-    
-    return render(request, 'gestion/dashboard_jefe.html', context)
+    return render(request, 'gestion/citas/crear_cita.html', {
+        'titulo': 'Nueva Cita',
+        'form': form
+    })
 
 @login_required
-def dashboard_encargado(request):
-    """Dashboard para encargados del taller"""
-    from django.utils import timezone
-    from django.db.models import Count, Q
+def editar_cita(request, pk):
+    """Vista para editar una cita existente"""
+    cita = get_object_or_404(Agenda, pk=pk)
     
-    hoy = timezone.now().date()
+    if request.method == 'POST':
+        form = CitaForm(request.POST, instance=cita)
+        if form.is_valid():
+            try:
+                cita_editada = form.save(commit=False)
+                # Validar que la fecha no sea pasada
+                if cita_editada.fecha < timezone.now().date():
+                    messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
+                # Validar que no haya otra cita a la misma hora (excluyendo la actual)
+                elif Agenda.objects.filter(fecha=cita_editada.fecha, hora=cita_editada.hora).exclude(pk=pk).exists():
+                    messages.error(request, 'Ya existe otra cita programada para esa fecha y hora.')
+                else:
+                    cita_editada.save()
+                    messages.success(request, 'Cita actualizada exitosamente.')
+                    return redirect('lista_citas')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar la cita: {str(e)}')
+    else:
+        form = CitaForm(instance=cita)
     
-    # Citas de hoy
-    citas_hoy = Agenda.objects.filter(
-        fecha=hoy
-    ).select_related('cliente', 'servicio').order_by('hora')
-    
-    # Reparaciones en progreso o pendientes
-    reparaciones_en_progreso = Reparacion.objects.filter(
-        estado__in=['En progreso', 'Pendiente']
-    ).select_related('vehiculo', 'servicio').order_by('fecha_ingreso')[:10]
-    
-    # Próximas citas (próximos 3 días)
-    proximos_dias = hoy + timezone.timedelta(days=3)
-    proximas_citas = Agenda.objects.filter(
-        fecha__range=[hoy, proximos_dias]
-    ).select_related('cliente', 'servicio').order_by('fecha', 'hora')[:5]
-    
-    # Estadísticas rápidas
-    total_citas_hoy = citas_hoy.count()
-    reparaciones_pendientes = Reparacion.objects.filter(
-        estado__in=['En progreso', 'Pendiente']
-    ).count()
-    
-    context = {
-        'titulo': 'Panel del Encargado',
-        'es_jefe': False,
-        'es_encargado': True,
-        'hoy': hoy,
-        'es_jefe': False,
-        'es_encargado': True,
-        'citas_hoy': citas_hoy,
-        'reparaciones_en_progreso': reparaciones_en_progreso,
-    }
-    
-    return render(request, 'gestion/dashboard_encargado.html', context)
+    return render(request, 'gestion/citas/editar_cita.html', {
+        'titulo': 'Editar Cita',
+        'form': form,
+        'cita': cita
+    })
 
 @login_required
-def dashboard_reparaciones(request):
-    """
-    Dashboard para gestionar reparaciones en el taller.
-    Muestra estadísticas, últimas reparaciones y estado actual.
-    """
-    from django.db.models import Count, Q
+def eliminar_cita(request, pk):
+    """Vista para eliminar una cita"""
+    cita = get_object_or_404(Agenda, pk=pk)
     
-    # Verificar permisos
-    if not request.user.is_authenticated or not (es_jefe(request.user) or es_encargado(request.user)):
-        return redirect('login')
+    if request.method == 'POST':
+        try:
+            cita.delete()
+            messages.success(request, 'Cita eliminada exitosamente.')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar la cita: {str(e)}')
+        return redirect('lista_citas')
     
-    # Obtener estadísticas de reparaciones
-    reparaciones_totales = Reparacion.objects.count()
-    reparaciones_en_progreso = Reparacion.objects.filter(estado_reparacion='en_progreso').count()
-    reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
-    reparaciones_pendientes = Reparacion.objects.filter(estado_reparacion='pendiente').count()
-    
-    # Obtener las últimas 10 reparaciones
-    ultimas_reparaciones = Reparacion.objects.select_related(
-        'vehiculo', 'vehiculo__cliente', 'servicio'
-    ).order_by('-fecha_ingreso')[:10]
-    
-    # Reparaciones por estado (para gráfico)
-    reparaciones_por_estado = {
-        'Completada': Reparacion.objects.filter(estado_reparacion='completada').count(),
-        'En Progreso': Reparacion.objects.filter(estado_reparacion='en_progreso').count(),
-        'Pendiente': Reparacion.objects.filter(estado_reparacion='pendiente').count(),
-        'En Espera': Reparacion.objects.filter(estado_reparacion='en_espera').count(),
-        'Lista para Revisión': Reparacion.objects.filter(estado_reparacion='revision').count(),
-        'Cancelada': Reparacion.objects.filter(estado_reparacion='cancelada').count()
-    }
-    
-    # Servicios más solicitados
-    servicios_mas_solicitados = Servicio.objects.annotate(
-        total=Count('reparacion')
-    ).order_by('-total')[:5]
-    
-    context = {
-        'titulo': 'Dashboard de Reparaciones',
-        'total_reparaciones': total_reparaciones,
-        'reparaciones_completadas': reparaciones_completadas,
-        'reparaciones_en_progreso': reparaciones_en_progreso,
-        'reparaciones_pendientes': reparaciones_pendientes,
-        'ultimas_reparaciones': ultimas_reparaciones,
-        'reparaciones_por_estado': reparaciones_por_estado,
-        'servicios_mas_solicitados': servicios_mas_solicitados,
-        'es_jefe': es_jefe(request.user),
-        'es_encargado': True
-    }
-    
-    return render(request, 'gestion/dashboard_reparaciones.html', context)
+    return render(request, 'gestion/citas/eliminar_cita.html', {
+        'titulo': 'Eliminar Cita',
+        'cita': cita
+    })
 
 @login_required
-def dashboard_cliente(request):
-    """
-    Dashboard personalizado para clientes del taller.
-    Muestra información relevante sobre sus vehículos, citas y reparaciones.
-    """
-    from django.utils import timezone
-    
-    # Obtener el perfil del cliente
+@api_view(['GET'])
+def obtener_horas_disponibles(request, fecha):
+    """API para obtener las horas disponibles en una fecha específica"""
     try:
-        perfil = request.user.profile
-        cliente = Cliente.objects.get(correo_electronico=request.user.email)
-    except (UserProfile.DoesNotExist, Cliente.DoesNotExist):
-        # Si no existe el perfil o el cliente, redirigir a completar registro
-        messages.info(request, 'Por favor, complete su perfil de cliente')
-        return redirect('completar_perfil')
-    
-    # Obtener los vehículos del cliente
-    vehiculos = Vehiculo.objects.filter(cliente=cliente)
-    
-    # Obtener las reparaciones recientes (últimos 3 meses)
-    tres_meses_atras = timezone.now() - timezone.timedelta(days=90)
-    reparaciones = Reparacion.objects.filter(
-        vehiculo__in=vehiculos,
-        fecha_ingreso__gte=tres_meses_atras
-    ).select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:5]
-    
-    # Obtener citas programadas (futuras y de hoy)
-    hoy = timezone.now().date()
-    citas = Agenda.objects.filter(
-        cliente=cliente,
-        fecha__gte=hoy
-    ).select_related('servicio').order_by('fecha', 'hora')
-    
-    # Obtener vehículos con reparaciones recientes
-    vehiculos_con_reparaciones = []
-    for vehiculo in vehiculos:
-        ultima_reparacion = Reparacion.objects.filter(
-            vehiculo=vehiculo
-        ).order_by('-fecha_ingreso').first()
-        vehiculos_con_reparaciones.append({
-            'vehiculo': vehiculo,
-            'ultima_reparacion': ultima_reparacion
-        })
-    
-    # Estadísticas rápidas
-    total_vehiculos = vehiculos.count()
-    total_reparaciones = Reparacion.objects.filter(
-        vehiculo__in=vehiculos
-    ).count()
-    total_citas_pendientes = citas.count()
-    
-    context = {
-        'titulo': 'Mi Espacio Cliente',
-        'cliente': cliente,
-        'vehiculos': vehiculos_con_reparaciones,
-        'reparaciones': reparaciones,
-        'citas': citas,
-        'total_vehiculos': total_vehiculos,
-        'total_reparaciones': total_reparaciones,
-        'total_citas_pendientes': total_citas_pendientes,
-        'hoy': hoy,
-    }
-    
-    return render(request, 'gestion/dashboard_cliente.html', context)
-
-
-@login_required
-def clientes_lista(request):
-    """Lista de clientes"""
-    clientes = Cliente.objects.all()
-    return render(request, 'clientes_lista.html', {'clientes': clientes})
-
-
-@login_required
-def empleados_lista(request):
-    """Lista de empleados"""
-    try:
-        empleados = Empleado.objects.all()
-        empleados_lista = list(empleados)  # Forzar evaluación del QuerySet
-        context = {
-            'empleados': empleados_lista,
-            'puestos': Empleado.objects.values_list('puesto', flat=True).distinct()
-        }
+        # Convertir la fecha de string a objeto date
+        fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
+        
+        # Obtener las horas ocupadas para la fecha dada
+        horas_ocupadas = list(Agenda.objects.filter(
+            fecha=fecha_obj
+        ).values_list('hora', flat=True))
+        
+        # Generar lista de horas disponibles (de 8:00 a 17:00, cada 30 minutos)
+        horas_disponibles = []
+        hora_actual = dt_time(8, 0)  # Empieza a las 8:00 AM
+        hora_fin = dt_time(17, 0)    # Termina a las 5:00 PM
+        
+        while hora_actual <= hora_fin:
+            # Verificar si la hora actual no está ocupada
+            if hora_actual not in horas_ocupadas:
+                horas_disponibles.append(hora_actual.strftime('%H:%M'))
+            
+            # Añadir 30 minutos
+            hora_actual = (datetime.combine(datetime.today(), hora_actual) + 
+                          timedelta(minutes=30)).time()
+        
+        return JsonResponse({'horas_disponibles': horas_disponibles})
     except Exception as e:
-        # Si hay error con el ORM, intentar consulta directa
-        empleados_lista = []
-        puestos = []
-        error_msg = f"Error con empleados: {str(e)}"
+        return JsonResponse({'error': str(e)}, status=400)
 
-        try:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT nombre, puesto, telefono, correo_electronico FROM gestion_empleado")
-                empleados_raw = cursor.fetchall()
+# ========== VISTAS BASADAS EN CLASES ==========
 
-                # Crear objetos Empleado manualmente
-                for emp_data in empleados_raw:
-                    class EmpleadoTemp:
-                        def __init__(self, nombre, puesto, telefono, correo):
-                            self.nombre = nombre
-                            self.puesto = puesto
-                            self.telefono = telefono
-                            self.correo_electronico = correo
-
-                        def __str__(self):
-                            return self.nombre
-
-                    empleados_lista.append(EmpleadoTemp(*emp_data))
-
-                # Obtener puestos únicos
-                cursor.execute("SELECT DISTINCT puesto FROM gestion_empleado")
-                puestos_raw = cursor.fetchall()
-                puestos = [puesto[0] for puesto in puestos_raw if puesto[0]]
-
-        except Exception as db_error:
-            error_msg += f" | Error DB: {str(db_error)}"
-
-        context = {
-            'empleados': empleados_lista,
-            'puestos': puestos,
-            'error': error_msg
-        }
-
-    return render(request, 'empleados_lista.html', context)
-
-
-@login_required
-def servicios_lista(request):
-    """Lista de servicios"""
-    servicios = Servicio.objects.all()
-    return render(request, 'servicios_lista.html', {'servicios': servicios})
-
-
-@login_required
-@jefe_required
-def clientes_crear(request):
-    """Crear nuevo cliente con vehículos usando ModelForm y formsets"""
-    VehiculoFormSet = formset_factory(VehiculoForm, extra=1, can_delete=True)
-
-    if request.method == 'POST':
-        form = ClienteForm(request.POST)
-        formset = VehiculoFormSet(request.POST, prefix='vehiculos')
-
-        if form.is_valid() and formset.is_valid():
-            try:
-                # Crear el cliente primero
-                cliente = form.save()
-
-                # Crear los vehículos asociados
-                for vehiculo_form in formset:
-                    if vehiculo_form.cleaned_data.get('marca'):  # Solo si tiene datos
-                        vehiculo = vehiculo_form.save(commit=False)
-                        vehiculo.cliente = cliente
-                        vehiculo.save()
-
-                messages.success(request, f'Cliente "{cliente.nombre}" creado exitosamente con {formset.total_form_count()} vehículo(s).')
-                return redirect('clientes-lista')
-
-            except Exception as e:
-                messages.error(request, f'Error al crear cliente: {str(e)}')
-        else:
-            # Mostrar errores específicos
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'Cliente - {field}: {error}')
-
-            for i, vehiculo_form in enumerate(formset):
-                if vehiculo_form.errors:
-                    for field, errors in vehiculo_form.errors.items():
-                        for error in errors:
-                            messages.error(request, f'Vehículo {i+1} - {field}: {error}')
-
-            if formset.non_form_errors():
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Vehículo: {error}')
-    else:
-        form = ClienteForm()
-        formset = VehiculoFormSet(prefix='vehiculos')
-
-    context = {
-        'form': form,
-        'formset': formset,
-        'accion': 'Crear'
-    }
-    return render(request, 'clientes_form.html', context)
-
-
-@login_required
-@jefe_required
-def clientes_editar(request, pk):
-    """Editar cliente existente con vehículos usando ModelForm y formsets"""
-    cliente = get_object_or_404(Cliente, pk=pk)
-    VehiculoFormSet = formset_factory(VehiculoForm, extra=1, can_delete=True)
-
-    if request.method == 'POST':
-        form = ClienteForm(request.POST, instance=cliente)
-        formset = VehiculoFormSet(request.POST, prefix='vehiculos')
-
-        if form.is_valid() and formset.is_valid():
-            try:
-                # Guardar el cliente primero
-                cliente_actualizado = form.save()
-
-                # Eliminar vehículos marcados para eliminación
-                for vehiculo_form in formset:
-                    if vehiculo_form.cleaned_data.get('DELETE', False):
-                        vehiculo_id = vehiculo_form.cleaned_data.get('id')
-                        if vehiculo_id:
-                            vehiculo_id.delete()
-
-                # Crear/actualizar vehículos
-                for vehiculo_form in formset:
-                    if vehiculo_form.cleaned_data.get('marca') and not vehiculo_form.cleaned_data.get('DELETE', False):
-                        vehiculo = vehiculo_form.save(commit=False)
-                        if hasattr(vehiculo_form, 'instance') and vehiculo_form.instance.pk:
-                            # Actualizar vehículo existente
-                            vehiculo.pk = vehiculo_form.instance.pk
-                        vehiculo.cliente = cliente_actualizado
-                        vehiculo.save()
-
-                messages.success(request, f'Cliente "{cliente_actualizado.nombre}" actualizado exitosamente.')
-                return redirect('clientes-lista')
-
-            except Exception as e:
-                messages.error(request, f'Error al actualizar cliente: {str(e)}')
-        else:
-            # Mostrar errores específicos
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'Cliente - {field}: {error}')
-
-            for i, vehiculo_form in enumerate(formset):
-                if vehiculo_form.errors:
-                    for field, errors in vehiculo_form.errors.items():
-                        for error in errors:
-                            messages.error(request, f'Vehículo {i+1} - {field}: {error}')
-
-            if formset.non_form_errors():
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Vehículo: {error}')
-    else:
-        form = ClienteForm(instance=cliente)
-        # Crear formset con vehículos existentes
-        vehiculos_existentes = cliente.vehiculos.all()
-        formset = VehiculoFormSet(
-            prefix='vehiculos',
-            initial=[{'marca': v.marca, 'modelo': v.modelo, 'año': v.año, 'placa': v.placa} for v in vehiculos_existentes]
-        )
-
-    context = {
-        'form': form,
-        'cliente': cliente,
-        'formset': formset,
-        'accion': 'Editar'
-    }
-    return render(request, 'clientes_form.html', context)
-
-
-@login_required
-@jefe_required
-def clientes_eliminar(request, pk):
-    """Eliminar cliente"""
-    cliente = get_object_or_404(Cliente, pk=pk)
-
-    if request.method == 'POST':
-        try:
-            nombre = cliente.nombre
-            cliente.delete()
-            messages.success(request, f'Cliente "{nombre}" eliminado exitosamente.')
-            return redirect('clientes-lista')
-        except Exception as e:
-            messages.error(request, f'Error al eliminar cliente: {str(e)}')
-
-    context = {'cliente': cliente}
-    return render(request, 'clientes_confirm_delete.html', context)
-
-
-@login_required
-@empleados_management_required
-def empleados_crear(request):
-    """Crear nuevo empleado usando ModelForm"""
-    if request.method == 'POST':
-        form = EmpleadoForm(request.POST)
-        if form.is_valid():
-            try:
-                empleado = form.save()
-                messages.success(request, f'Empleado "{empleado.nombre}" creado exitosamente.')
-                return redirect('empleados-lista')
-            except Exception as e:
-                messages.error(request, f'Error al crear empleado: {str(e)}')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
-    else:
-        form = EmpleadoForm()
-
-    context = {
-        'form': form,
-        'accion': 'Crear'
-    }
-    return render(request, 'empleados_form.html', context)
-
-
-@login_required
-@empleados_management_required
-def empleados_editar(request, pk):
-    """Editar empleado existente usando ModelForm"""
-    empleado = get_object_or_404(Empleado, pk=pk)
-
-    if request.method == 'POST':
-        form = EmpleadoForm(request.POST, instance=empleado)
-        if form.is_valid():
-            try:
-                empleado_actualizado = form.save()
-                messages.success(request, f'Empleado "{empleado_actualizado.nombre}" actualizado exitosamente.')
-                return redirect('empleados-lista')
-            except Exception as e:
-                messages.error(request, f'Error al actualizar empleado: {str(e)}')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
-    else:
-        form = EmpleadoForm(instance=empleado)
-
-    context = {
-        'form': form,
-        'empleado': empleado,
-        'accion': 'Editar'
-    }
-    return render(request, 'empleados_form.html', context)
-
-
-@login_required
-@empleados_management_required
-def empleados_eliminar(request, pk):
-    """Eliminar empleado"""
-    empleado = get_object_or_404(Empleado, pk=pk)
-
-    if request.method == 'POST':
-        try:
-            nombre = empleado.nombre
-            empleado.delete()
-            messages.success(request, f'Empleado "{nombre}" eliminado exitosamente.')
-            return redirect('empleados-lista')
-        except Exception as e:
-            messages.error(request, f'Error al eliminar empleado: {str(e)}')
-
-    context = {'empleado': empleado}
-    return render(request, 'empleados_confirm_delete.html', context)
-
-
-@login_required
-@servicios_management_required
-def servicios_crear(request):
-    """Crear nuevo servicio usando ModelForm"""
-    if request.method == 'POST':
-        form = ServicioForm(request.POST)
-        if form.is_valid():
-            try:
-                servicio = form.save()
-                messages.success(request, f'Servicio "{servicio.nombre_servicio}" creado exitosamente.')
-                return redirect('servicios-lista')
-            except Exception as e:
-                messages.error(request, f'Error al crear servicio: {str(e)}')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
-    else:
-        form = ServicioForm()
-
-    context = {
-        'form': form,
-        'accion': 'Crear'
-    }
-    return render(request, 'servicios_form.html', context)
-
-
-@login_required
-@servicios_management_required
-def servicios_editar(request, pk):
-    """Editar servicio existente usando ModelForm"""
-    servicio = get_object_or_404(Servicio, pk=pk)
-
-    if request.method == 'POST':
-        form = ServicioForm(request.POST, instance=servicio)
-        if form.is_valid():
-            try:
-                servicio_actualizado = form.save()
-                messages.success(request, f'Servicio "{servicio_actualizado.nombre_servicio}" actualizado exitosamente.')
-                return redirect('servicios-lista')
-            except Exception as e:
-                messages.error(request, f'Error al actualizar servicio: {str(e)}')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field}: {error}')
-    else:
-        form = ServicioForm(instance=servicio)
-
-    context = {
-        'form': form,
-        'servicio': servicio,
-        'accion': 'Editar'
-    }
-    return render(request, 'servicios_form.html', context)
-
-
-@login_required
-@servicios_management_required
-def servicios_eliminar(request, pk):
-    """Eliminar servicio"""
-    servicio = get_object_or_404(Servicio, pk=pk)
-
-    if request.method == 'POST':
-        try:
-            servicio.delete()
-            messages.success(request, 'Servicio eliminado correctamente.')
-            return redirect('servicios-lista')
-        except Exception as e:
-            messages.error(request, f'Error al eliminar servicio: {str(e)}')
-    return render(request, 'gestion/confirmar_eliminar.html', {
-        'titulo': 'Eliminar Servicio',
-        'mensaje': f'¿Estás seguro de que deseas eliminar el servicio "{servicio.nombre}"?',
-        'url_volver': 'servicios-lista'
-    })
-
-
-@login_required
-def buscar_clientes(request):
-    """Vista para buscar clientes por nombre o apellido (AJAX)"""
-    query = request.GET.get('q', '')
-    if len(query) < 2:
-        return JsonResponse({'error': 'Ingrese al menos 2 caracteres para buscar'}, status=400)
-    
-    clientes = Cliente.objects.filter(
-        Q(nombre__icontains=query) | 
-        Q(apellido__icontains=query) |
-        Q(cedula__icontains=query)
-    ).values('id', 'nombre', 'apellido', 'cedula')[:10]
-    
-    return JsonResponse(list(clientes), safe=False)
-
-
-@login_required
-def vehiculo_agregar(request, cliente_id=None):
-    """Vista para agregar un vehículo, con o sin cliente pre-seleccionado"""
-    cliente = None
-    if cliente_id:
-        cliente = get_object_or_404(Cliente, pk=cliente_id)
-    
-    if request.method == 'POST':
-        form = VehiculoForm(request.POST)
-        if form.is_valid():
-            vehiculo = form.save(commit=False)
-            # Si se pasó un cliente_id, lo usamos en lugar del seleccionado en el formulario
-            if cliente:
-                vehiculo.cliente = cliente
-            vehiculo.save()
-            messages.success(request, 'Vehículo registrado correctamente.')
-            return redirect('vehiculos-lista')
-    else:
-        # Si hay un cliente, lo establecemos como valor inicial
-        initial = {'cliente': cliente.id} if cliente else {}
-        form = VehiculoForm(initial=initial)
-    
-    return render(request, 'gestion/vehiculo_form.html', {
-        'titulo': 'Agregar Vehículo',
-        'form': form,
-        'cliente': cliente,
-        'es_jefe': request.user.empleado.es_jefe if hasattr(request.user, 'empleado') else False,
-        'es_encargado': request.user.empleado.es_encargado if hasattr(request.user, 'empleado') else False
-    })
-
-
-@login_required
-def vehiculo_editar(request, pk):
-    """Vista para editar un vehículo existente"""
-    vehiculo = get_object_or_404(Vehiculo, pk=pk)
-    
-    if request.method == 'POST':
-        form = VehiculoForm(request.POST, instance=vehiculo)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Vehículo actualizado correctamente.')
-            return redirect('vehiculos-lista')
-    else:
-        form = VehiculoForm(instance=vehiculo)
-    
-    return render(request, 'gestion/vehiculo_form.html', {
-        'titulo': 'Editar Vehículo',
-        'form': form,
-        'vehiculo': vehiculo,
-        'es_jefe': request.user.empleado.es_jefe if hasattr(request.user, 'empleado') else False,
-        'es_encargado': request.user.empleado.es_encargado if hasattr(request.user, 'empleado') else False
-    })
-
-
-@login_required
-def vehiculo_eliminar(request, pk):
-    """Vista para eliminar un vehículo"""
-    vehiculo = get_object_or_404(Vehiculo, pk=pk)
-    if request.method == 'POST':
-        vehiculo.delete()
-        messages.success(request, 'Vehículo eliminado correctamente.')
-        return redirect('vehiculos-lista')
-    return render(request, 'gestion/confirmar_eliminar.html', {
-        'titulo': 'Eliminar Vehículo',
-        'mensaje': f'¿Estás seguro de que deseas eliminar el vehículo con placa "{vehiculo.placa}"?',
-        'url_volver': 'vehiculos-lista'
-    })
-
-
-@login_required
-@servicios_management_required
-def servicios_eliminar(request, pk):
-    """Eliminar servicio"""
-    servicio = get_object_or_404(Servicio, pk=pk)
-
-    if request.method == 'POST':
-        try:
-            servicio.delete()
-            messages.success(request, 'Servicio eliminado correctamente.')
-            return redirect('servicios-lista')
-        except Exception as e:
-            messages.error(request, f'Error al eliminar servicio: {str(e)}')
-    return render(request, 'gestion/confirmar_eliminar.html', {
-        'titulo': 'Eliminar Servicio',
-        'mensaje': f'¿Estás seguro de que deseas eliminar el servicio "{servicio.nombre}"?',
-        'url_volver': 'servicios-lista'
-    })
-
-# --- Funciones de utilidad para permisos ---
-
-def es_jefe(user):
-    """Verifica si el usuario es jefe (tiene permisos completos)"""
-    try:
-        return not user.profile.es_empleado or user.profile.empleado_relacionado.puesto.lower() == 'jefe'
-    except:
-        return False
-
-def es_encargado(user):
-    """Verifica si el usuario es un encargado con permisos limitados"""
-    try:
-        return (user.profile.es_empleado and
-                user.profile.empleado_relacionado.puesto.lower() in ['encargado', 'supervisor'])
-    except:
-        return False
-
-def puede_gestionar_empleados(user):
-    """Verifica si el usuario puede gestionar empleados (agregar/editar/eliminar)"""
-    return es_jefe(user)
-
-def puede_gestionar_servicios(user):
-    """Verifica si el usuario puede gestionar servicios (agregar/editar/eliminar)"""
-    return es_jefe(user)
-
-
-# --- Vistas basadas en clases ---
-
-@method_decorator(login_required, name='dispatch')
 class VehiculoListView(ListView):
     """
     Vista basada en clase para mostrar la lista de vehículos con búsqueda y paginación.
@@ -1038,24 +738,25 @@ class VehiculoListView(ListView):
     paginate_by = 10
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        # Filtrar por búsqueda si se proporciona
-        search_query = self.request.GET.get('q', '')
-        if search_query:
+        queryset = super().get_queryset().select_related('cliente')
+        busqueda = self.request.GET.get('q', '').strip()
+        
+        if busqueda:
+            # Búsqueda por placa, marca, modelo o nombre del cliente
             queryset = queryset.filter(
-                Q(placa__icontains=search_query) |
-                Q(marca__icontains=search_query) |
-                Q(modelo__icontains=search_query) |
-                Q(cliente__nombre__icontains=search_query) |
-                Q(cliente__apellido__icontains=login_required)
+                Q(placa__icontains=busqueda) |
+                Q(marca__icontains=busqueda) |
+                Q(modelo__icontains=busqueda) |
+                Q(cliente__nombre__icontains=busqueda) |
+                Q(cliente__apellido__icontains=busqueda)
             )
-        return queryset.select_related('cliente')
+        
+        return queryset.order_by('-id')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['titulo'] = 'Lista de Vehículos'
-        context['es_jefe'] = self.request.user.empleado.es_jefe if hasattr(self.request.user, 'empleado') else False
-        context['es_encargado'] = self.request.user.empleado.es_encargado if hasattr(self.request.user, 'empleado') else False
+        context['busqueda'] = self.request.GET.get('q', '')
         return context
 
 

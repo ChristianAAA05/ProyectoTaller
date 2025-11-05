@@ -105,12 +105,15 @@
                             <td>{{ vehiculo.placa }}</td>
                             <td>{{ vehiculo.marca }}</td>
                             <td>{{ vehiculo.modelo }}</td>
-                            <td>{{ vehiculo.anio }}</td>
+                            <td>{{ vehiculo.año }}</td>
                             <td>{{ vehiculo.cliente.nombre }} {{ vehiculo.cliente.apellido }}</td>
                             <td>{{ vehiculo.cliente.telefono }}</td>
                             <td>
-                                <a href="#" class="btn btn-sm btn-warning" title="Editar">
+                                <a href="{% url 'vehiculo-editar' vehiculo.pk %}" class="btn btn-sm btn-warning" title="Editar">
                                     <i class="fas fa-edit"></i> Editar
+                                </a>
+                                <a href="{% url 'vehiculo-eliminar' vehiculo.pk %}" class="btn btn-sm btn-danger" title="Eliminar">
+                                    <i class="fas fa-trash"></i> Eliminar
                                 </a>
                             </td>
                         </tr>

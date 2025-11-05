@@ -26,10 +26,10 @@
 </div>
 {% endif %}
 
-{% if citas_hoy.count > 0 %}
+{% if citas_hoy_count > 0 %}
 <div class="alert alert-info alert-dismissible fade show" role="alert">
     <i class="fas fa-calendar-day me-2"></i>
-    Tienes <strong>{{ citas_hoy.count }} citas programadas</strong> para hoy.
+    Tienes <strong>{{ citas_hoy_count }} citas programadas</strong> para hoy.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
 </div>
 {% endif %}
@@ -75,7 +75,7 @@
                             Vehículos Registrados</div>
                         <div class="h2 mb-1">{{ total_vehiculos|intcomma }}</div>
                         <div class="text-xs">
-                            <span class="text-muted">Último mes: {{ vehiculos_frecuentes.count }} con más reparaciones</span>
+                            <span class="text-muted">Último mes: {{ vehiculos_frecuentes|length }} con más reparaciones</span>
                         </div>
                     </div>
                     <div class="col-auto">
@@ -251,7 +251,7 @@
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold text-primary">Reparaciones Recientes</h6>
-                <a href="#" class="btn btn-sm btn-primary">Ver Todas</a>
+                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-sm btn-primary">Ver Todas</a>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -273,8 +273,8 @@
                                 </td>
                                 <td>{{ reparacion.servicio.nombre_servicio|truncatechars:20 }}</td>
                                 <td>
-                                    <span class="badge {% if reparacion.estado == 'Pendiente' %}bg-warning{% elif reparacion.estado == 'En Proceso' %}bg-info{% elif reparacion.estado == 'Completada' %}bg-success{% else %}bg-danger{% endif %}">
-                                        {{ reparacion.estado }}
+                                    <span class="badge {% if reparacion.estado_reparacion == 'pendiente' %}bg-warning{% elif reparacion.estado_reparacion == 'en_progreso' %}bg-info{% elif reparacion.estado_reparacion == 'completada' %}bg-success{% elif reparacion.estado_reparacion == 'en_espera' %}bg-secondary{% elif reparacion.estado_reparacion == 'revision' %}bg-primary{% else %}bg-danger{% endif %}">
+                                        {{ reparacion.estado_reparacion|capfirst }}
                                     </span>
                                 </td>
                                 <td>
@@ -303,22 +303,25 @@
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold text-primary">Próximas Citas</h6>
-                <a href="#" class="btn btn-sm btn-primary">Ver Calendario</a>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'lista_citas' %}" class="btn btn-sm btn-primary">Ver Calendario</a>
+                    <a href="{% url 'crear_cita' %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-plus"></i> Nueva Cita
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
                     {% for cita in citas_proximas|slice:":5" %}
                     <div class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ cita.vehiculo.cliente.nombre }} {{ cita.vehiculo.cliente.apellido }}</h6>
+                            <h6 class="mb-1">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</h6>
                             <small>{{ cita.fecha|date:"d/m/Y" }} a las {{ cita.hora|time:"H:i" }}</small>
                         </div>
                         <p class="mb-1">
-                            <i class="fas fa-car me-2"></i>{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }} ({{ cita.vehiculo.placa }})
+                            <i class="fas fa-tools me-2"></i>{{ cita.servicio.nombre_servicio }}
                         </p>
-                        <small class="text-muted">
-                            <i class="fas fa-tools me-1"></i>{{ cita.servicio.nombre_servicio }}
-                        </small>
+                        <small class="text-muted">Cliente: {{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</small>
                     </div>
                     {% empty %}
                     <div class="text-center py-4">
@@ -348,9 +351,9 @@
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                            {{ empleado.get_puesto_display }}</div>
+                                            {{ empleado.puesto }}</div>
                                         <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                            {{ empleado.nombre }} {{ empleado.apellido }}
+                                            {{ empleado.nombre }}
                                         </div>
                                         <div class="mt-2">
                                             <span class="badge bg-success">
@@ -518,7 +521,7 @@ var ingresosChart = new Chart(ctxBar, {
                 </div>
             </div>
             <div class="card-footer text-end">
-                <a href="#" class="btn btn-sm btn-outline-primary">Ver todas las reparaciones</a>
+                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-sm btn-outline-primary">Ver todas las reparaciones</a>
             </div>
         </div>
     </div>
@@ -548,7 +551,7 @@ var ingresosChart = new Chart(ctxBar, {
                 </div>
             </div>
             <div class="card-footer text-end">
-                <a href="#" class="btn btn-sm btn-outline-primary">Ver todas las citas</a>
+                <a href="{% url 'lista_citas' %}" class="btn btn-sm btn-outline-primary">Ver todas las citas</a>
             </div>
         </div>
     </div>

@@ -1,0 +1,94 @@
+{% extends 'gestion/citas/base_citas.html' %}
+{% load crispy_forms_tags %}
+
+{% block titulo_pagina %}Editar Cita{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item">Editar Cita</li>
+{% endblock %}
+
+{% block titulo %}Editar Cita{% endblock %}
+
+{% block acciones %}
+    <a href="{% url 'lista_citas' %}" class="btn btn-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Volver al listado
+    </a>
+{% endblock %}
+
+{% block contenido_cita %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Detalles de la Cita</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" id="citaForm" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.cliente|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.servicio|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.fecha|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.hora|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'lista_citas' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    $(document).ready(function() {
+        // Cargar horas disponibles cuando cambia la fecha
+        $('input[name="fecha"]').change(function() {
+            const fecha = $(this).val();
+            if (fecha) {
+                $.get(`/api/agenda/horas-disponibles/${fecha}/`, function(data) {
+                    const horaSelect = $('select[name="hora"]');
+                    const currentHora = '{{ cita.hora|time:"H:i" }}';
+                    horaSelect.empty();
+                    
+                    if (data.horas_disponibles && data.horas_disponibles.length > 0) {
+                        $.each(data.horas_disponibles, function(index, hora) {
+                            const option = new Option(hora, hora);
+                            if (hora === currentHora) {
+                                $(option).prop('selected', true);
+                            }
+                            horaSelect.append(option);
+                        });
+                    } else {
+                        horaSelect.append(new Option('No hay horas disponibles', ''));
+                    }
+                });
+            }
+        });
+        
+        // Inicializar el selector de hora con las horas disponibles para la fecha actual
+        $('input[name="fecha"]').trigger('change');
+    });
+</script>
+{% endblock %}

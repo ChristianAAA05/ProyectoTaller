@@ -47,8 +47,8 @@ INSTALLED_APPS = [
     # Aplicación principal del taller
     'gestion',                   # Nuestra app personalizada
 
-    # Django REST Framework para API (comentado hasta instalación completa)
-    # 'rest_framework', # mas adelante para la API REST
+    # Django REST Framework para API
+    'rest_framework',
 ]
 
 # ========== MIDDLEWARE ==========
@@ -143,10 +143,11 @@ def permisos_context(request):
     directamente en los templates sin necesidad de pasarlas desde las vistas.
     """
     if request.user.is_authenticated:
-        from gestion.views import es_jefe, puede_gestionar_empleados, puede_gestionar_servicios
+        from gestion.views import es_jefe, es_encargado, puede_gestionar_empleados, puede_gestionar_servicios
 
         return {
             'es_jefe': es_jefe(request.user),
+            'es_encargado': es_encargado(request.user),
             'puede_gestionar_empleados': puede_gestionar_empleados(request.user),
             'puede_gestionar_servicios': puede_gestionar_servicios(request.user),
         }

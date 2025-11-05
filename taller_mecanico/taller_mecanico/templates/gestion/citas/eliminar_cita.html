@@ -1,0 +1,51 @@
+{% extends 'gestion/citas/base_citas.html' %}
+
+{% block titulo_pagina %}Eliminar Cita{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item">Eliminar Cita</li>
+{% endblock %}
+
+{% block titulo %}¿Eliminar Cita?{% endblock %}
+
+{% block acciones %}
+    <a href="{% url 'lista_citas' %}" class="btn btn-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Volver al listado
+    </a>
+{% endblock %}
+
+{% block contenido_cita %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 bg-danger text-white">
+                <h6 class="m-0 font-weight-bold">Confirmar Eliminación</h6>
+            </div>
+            <div class="card-body">
+                <p>¿Está seguro que desea eliminar la siguiente cita?</p>
+                
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</h5>
+                        <p class="card-text">
+                            <strong>Servicio:</strong> {{ cita.servicio.nombre_servicio }}<br>
+                            <strong>Fecha:</strong> {{ cita.fecha|date:"d/m/Y" }}<br>
+                            <strong>Hora:</strong> {{ cita.hora|time:"H:i" }}
+                        </p>
+                    </div>
+                </div>
+                
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> Sí, eliminar
+                    </button>
+                </form>
+                <a href="{% url 'lista_citas' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

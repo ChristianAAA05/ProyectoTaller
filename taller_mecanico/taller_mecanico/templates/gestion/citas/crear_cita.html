@@ -1,0 +1,109 @@
+{% extends 'gestion/citas/base_citas.html' %}
+
+{% block titulo_pagina %}Nueva Cita{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item">Nueva Cita</li>
+{% endblock %}
+
+{% block titulo %}Programar Nueva Cita{% endblock %}
+
+{% block acciones %}
+    <a href="{% url 'lista_citas' %}" class="btn btn-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Volver al listado
+    </a>
+{% endblock %}
+
+{% block contenido_cita %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <form method="post" id="citaForm" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.cliente.label_tag }}
+                            {{ form.cliente }}
+                            {% if form.cliente.errors %}
+                                <div class="text-danger">{{ form.cliente.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.servicio.label_tag }}
+                            {{ form.servicio }}
+                            {% if form.servicio.errors %}
+                                <div class="text-danger">{{ form.servicio.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.fecha.label_tag }}
+                            {{ form.fecha }}
+                            {% if form.fecha.errors %}
+                                <div class="text-danger">{{ form.fecha.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.hora.label_tag }}
+                            {{ form.hora }}
+                            {% if form.hora.errors %}
+                                <div class="text-danger">{{ form.hora.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'lista_citas' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cita
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fechaInput = document.querySelector('input[name="fecha"]');
+        const horaSelect = document.querySelector('select[name="hora"]');
+
+        async function cargarHoras(fecha) {
+            if (!fecha) return;
+            try {
+                const resp = await fetch(`/api/agenda/horas-disponibles/${fecha}/`);
+                const data = await resp.json();
+                horaSelect.innerHTML = '';
+                if (data.horas_disponibles && data.horas_disponibles.length) {
+                    for (const h of data.horas_disponibles) {
+                        const opt = document.createElement('option');
+                        opt.value = h;
+                        opt.textContent = h;
+                        horaSelect.appendChild(opt);
+                    }
+                } else {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No hay horas disponibles';
+                    horaSelect.appendChild(opt);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        fechaInput.addEventListener('change', (e) => cargarHoras(e.target.value));
+        if (fechaInput.value) cargarHoras(fechaInput.value);
+    });
+</script>
+{% endblock %}

@@ -18,7 +18,9 @@ Cada formulario incluye:
 """
 
 from django import forms
-from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda
 
 class ClienteForm(forms.ModelForm):
     """
@@ -210,6 +212,7 @@ class ReparacionForm(forms.ModelForm):
     Permite gestionar la información de las reparaciones de vehículos,
     incluyendo el vehículo, servicio, fechas y estado.
     """
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Personalizar el campo condición del vehículo
@@ -268,3 +271,63 @@ class ReparacionForm(forms.ModelForm):
             'estado_reparacion': 'Seleccione el estado actual de la reparación.',
             'notas': 'Puede agregar notas adicionales sobre la reparación.'
         }
+
+
+class CitaForm(forms.ModelForm):
+    """Formulario para crear y editar citas en el taller.
+    
+    Permite gestionar las citas de los clientes, incluyendo el servicio,
+    fecha y hora de la cita.
+    """
+    class Meta:
+        model = Agenda
+        fields = ['cliente', 'servicio', 'fecha', 'hora']
+        
+        # Widgets personalizados
+        widgets = {
+            'cliente': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+                'title': 'Seleccione el cliente'
+            }),
+            'servicio': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+                'title': 'Seleccione el servicio'
+            }),
+            'fecha': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'min': timezone.now().strftime('%Y-%m-%d'),
+                'required': True
+            }),
+            'hora': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+                'id': 'hora-select'
+            })
+        }
+    
+    def clean_fecha(self):
+        """Valida que la fecha no sea pasada"""
+        fecha = self.cleaned_data.get('fecha')
+        if fecha and fecha < timezone.now().date():
+            raise ValidationError('No se pueden agendar citas en fechas pasadas.')
+        return fecha
+    
+    def clean(self):
+        """Valida que no exista otra cita en la misma fecha y hora"""
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get('fecha')
+        hora = cleaned_data.get('hora')
+        
+        if fecha and hora:
+            # Si estamos editando una cita, excluirla de la validación
+            if self.instance and self.instance.pk:
+                if Agenda.objects.filter(fecha=fecha, hora=hora).exclude(pk=self.instance.pk).exists():
+                    raise ValidationError('Ya existe una cita programada para esta fecha y hora.')
+            # Si es una cita nueva
+            elif Agenda.objects.filter(fecha=fecha, hora=hora).exists():
+                raise ValidationError('Ya existe una cita programada para esta fecha y hora.')
+        
+        return cleaned_data
