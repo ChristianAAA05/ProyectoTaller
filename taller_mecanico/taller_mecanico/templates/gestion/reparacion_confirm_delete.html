@@ -1,0 +1,49 @@
+{% extends 'gestion/base_dashboard.html' %}
+
+{% block title %}Eliminar Reparación{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Eliminar Reparación</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_reparaciones' %}">Reparaciones</a></li>
+        <li class="breadcrumb-item active">Eliminar</li>
+    </ol>
+
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Confirmar eliminación
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                ¿Seguro que deseas eliminar esta reparación?
+            </div>
+
+            <dl class="row">
+                <dt class="col-sm-3">Vehículo</dt>
+                <dd class="col-sm-9">{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }} ({{ reparacion.vehiculo.placa }})</dd>
+
+                <dt class="col-sm-3">Cliente</dt>
+                <dd class="col-sm-9">{{ reparacion.vehiculo.cliente.nombre }} {{ reparacion.vehiculo.cliente.apellido }}</dd>
+
+                <dt class="col-sm-3">Servicio</dt>
+                <dd class="col-sm-9">{{ reparacion.servicio.nombre_servicio }}</dd>
+
+                <dt class="col-sm-3">Estado</dt>
+                <dd class="col-sm-9">{{ reparacion.estado_reparacion|capfirst }}</dd>
+            </dl>
+
+            <form method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-trash me-1"></i> Eliminar
+                </button>
+                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

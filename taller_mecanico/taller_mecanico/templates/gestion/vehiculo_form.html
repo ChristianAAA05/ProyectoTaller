@@ -322,19 +322,20 @@ $(document).ready(function() {
             success: function(data) {
                 const $lista = $('#lista_clientes');
                 $lista.empty();
+                const lista = data.clientes || data.results || data;
                 
-                if (data.length === 0) {
+                if (!lista || lista.length === 0) {
                     $lista.append(`
                         <div class="list-group-item">
                             No se encontraron clientes con ese criterio de búsqueda.
                         </div>
                     `);
                 } else {
-                    data.forEach(function(cliente) {
+                    lista.forEach(function(cliente) {
                         $lista.append(`
                             <a href="#" class="list-group-item list-group-item-action cliente-item" 
                                data-id="${cliente.id}">
-                                ${cliente.nombre} ${cliente.apellido} (${cliente.cedula})
+                                ${cliente.nombre} ${cliente.apellido} (${cliente.cedula || ''})
                             </a>
                         `);
                     });

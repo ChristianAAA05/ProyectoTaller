@@ -1,0 +1,78 @@
+{% extends 'gestion/citas/base_citas.html' %}
+{% load static %}
+
+{% block titulo_pagina %}Lista de Citas{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item active">Lista</li>
+{% endblock %}
+
+{% block titulo %}Lista de Citas Programadas{% endblock %}
+
+{% block acciones %}
+    <a href="{% url 'crear_cita' %}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> Nueva Cita
+    </a>
+{% endblock %}
+
+{% block contenido_cita %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+        <thead class="table-light">
+            <tr>
+                <th>Cliente</th>
+                <th>Servicio</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in citas %}
+            <tr>
+                <td>{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</td>
+                <td>{{ cita.servicio.nombre }}</td>
+                <td>{{ cita.fecha|date:"d/m/Y" }}</td>
+                <td>{{ cita.hora|time:"H:i" }}</td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'editar_cita' cita.pk %}" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <a href="{% url 'eliminar_cita' cita.pk %}" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center">No hay citas programadas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<!-- DataTables JavaScript -->
+<script src="{% static 'vendor/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+
+<!-- Page level custom scripts -->
+<script>
+    $(document).ready(function() {
+        $('#dataTable').DataTable({
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
+            },
+            "order": [[2, "desc"], [3, "asc"]], // Ordenar por fecha descendente y hora ascendente
+            "columnDefs": [
+                { "orderable": false, "targets": [4] } // Deshabilitar ordenación en la columna de acciones
+            ]
+        });
+    });
+</script>
+{% endblock %}

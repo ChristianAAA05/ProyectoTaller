@@ -46,6 +46,8 @@ urlpatterns = [
     # Dashboard de reparaciones
     path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
     path('reparaciones/nueva/', views.crear_reparacion, name='crear_reparacion'),
+    path('reparaciones/editar/<int:pk>/', views.editar_reparacion, name='editar_reparacion'),
+    path('reparaciones/eliminar/<int:pk>/', views.eliminar_reparacion, name='eliminar_reparacion'),
     
     # ========== URLS DE API REST ==========
     # URLs automáticas para operaciones CRUD usando Django REST Framework
@@ -76,9 +78,9 @@ urlpatterns = [
     path('api/vehiculos/', views.VehiculoListCreate.as_view(), name='api-vehiculos-list-create'),      # GET (listar), POST (crear)
     path('api/vehiculos/<int:pk>/', views.VehiculoRetrieveUpdateDestroy.as_view(), name='api-vehiculo-detail'),  # GET, PUT, DELETE por ID
 
-    # Reparaciones - operaciones CRUD automáticas
-    path('reparaciones/', views.ReparacionListCreate.as_view(), name='reparaciones-list-create'),      # GET (listar), POST (crear)
-    path('reparaciones/<int:pk>/', views.ReparacionRetrieveUpdateDestroy.as_view(), name='reparacion-detail'),  # GET, PUT, DELETE por ID
+    # Reparaciones - operaciones CRUD automáticas (API)
+    path('api/reparaciones/', views.ReparacionListCreate.as_view(), name='api-reparaciones-list-create'),      # GET (listar), POST (crear)
+    path('api/reparaciones/<int:pk>/', views.ReparacionRetrieveUpdateDestroy.as_view(), name='api-reparacion-detail'),  # GET, PUT, DELETE por ID
 
     # ========== URLS DE VISTAS BASADAS EN PLANTILLAS ==========
     # Estas son las vistas que renderizan templates HTML para formularios manuales
@@ -103,6 +105,15 @@ urlpatterns = [
     path('servicios/crear/', views.servicios_crear, name='servicios-crear'),           # Formulario para crear servicio
     path('servicios/editar/<int:pk>/', views.servicios_editar, name='servicios-editar'),  # Formulario para editar servicio
     path('servicios/eliminar/<int:pk>/', views.servicios_eliminar, name='servicios-eliminar'),  # Confirmación para eliminar servicio
+
+    # ========== GESTIÓN DE CITAS ==========
+    path('citas/', views.lista_citas, name='lista_citas'),
+    path('citas/nueva/', views.crear_cita, name='crear_cita'),
+    path('citas/<int:pk>/editar/', views.editar_cita, name='editar_cita'),
+    path('citas/<int:pk>/eliminar/', views.eliminar_cita, name='eliminar_cita'),
+
+    # API para horas disponibles de agenda
+    path('api/agenda/horas-disponibles/<str:fecha>/', views.obtener_horas_disponibles, name='obtener_horas_disponibles'),
 
     # ========== INCLUSIÓN DE ROUTERS ==========
     # Incluye automáticamente las URLs generadas por el router para ViewSets
