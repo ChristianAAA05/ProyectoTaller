@@ -23,3 +23,6 @@ En el dashboard del encargado se debe mostrar:
 - poder ver las reparaciones
 - poder agregar reparaciones, eliminarlas y modificarlas
 Que funcionen adecuadamente los bloques "cita para hoy" , "Reparacion en curso" y "Tareas pendientes" "proximas citas"
+
+
+hola
