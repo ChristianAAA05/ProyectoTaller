@@ -48,6 +48,9 @@ urlpatterns = [
     path('reparaciones/nueva/', views.crear_reparacion, name='crear_reparacion'),
     path('reparaciones/editar/<int:pk>/', views.editar_reparacion, name='editar_reparacion'),
     path('reparaciones/eliminar/<int:pk>/', views.eliminar_reparacion, name='eliminar_reparacion'),
+    # Reportes
+    path('reportes/ingresos/', views.reportes_ingresos, name='reportes_ingresos'),
+    path('reportes/ingresos/exportar/', views.exportar_ingresos_excel, name='exportar_ingresos_excel'),
     
     # ========== URLS DE API REST ==========
     # URLs automáticas para operaciones CRUD usando Django REST Framework

@@ -91,9 +91,10 @@ class EmpleadoForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Ingrese el nombre del empleado'
             }),
-            'puesto': forms.Select(attrs={
-                'class': 'form-control'
-                # Nota: Las opciones se generan automáticamente desde el modelo
+            'puesto': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Mecánico, Recepcionista, Jefe de Taller',
+                'list': 'puestos-sugeridos'
             }),
             'telefono': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -212,22 +213,50 @@ class ReparacionForm(forms.ModelForm):
     Permite gestionar la información de las reparaciones de vehículos,
     incluyendo el vehículo, servicio, fechas y estado.
     """
+    # Definir las opciones para los campos de selección
+    CONDICION_OPCIONES = [
+        ('excelente', 'Excelente - Vehículo como nuevo, solo mantenimiento preventivo'),
+        ('bueno', 'Bueno - Desgaste leve, puede necesitar ajustes menores'),
+        ('regular', 'Regular - Desgaste notable, necesita reparaciones moderadas'),
+        ('malo', 'Malo - Desgastado, necesita reparaciones extensas'),
+        ('critico', 'Crítico - Daño estructural, posible pérdida total'),
+    ]
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Personalizar el campo condición del vehículo
-        self.fields['condicion_vehiculo'].widget = forms.Select(attrs={
+    ESTADO_REPARACION = [
+        ('pendiente', '🟡 Pendiente'),
+        ('en_progreso', '🔵 En Progreso'),
+        ('en_espera', '🟠 En Espera de Repuestos'),
+        ('revision', '🟣 Lista para Revisión'),
+        ('completada', '🟢 Completada'),
+        ('cancelada', '🔴 Cancelada'),
+    ]
+    
+    # Sobrescribir los campos para usar las opciones definidas
+    condicion_vehiculo = forms.ChoiceField(
+        choices=CONDICION_OPCIONES,
+        widget=forms.Select(attrs={
             'class': 'form-select',
             'required': True,
             'title': 'Seleccione la condición del vehículo'
         })
-        
-        # Personalizar el campo estado de la reparación
-        self.fields['estado_reparacion'].widget = forms.Select(attrs={
+    )
+    
+    estado_reparacion = forms.ChoiceField(
+        choices=ESTADO_REPARACION,
+        widget=forms.Select(attrs={
             'class': 'form-select',
             'required': True,
             'title': 'Seleccione el estado de la reparación'
         })
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Establecer valores iniciales si no se proporcionan
+        if not self.instance.pk:  # Solo para formularios nuevos
+            self.initial['condicion_vehiculo'] = 'regular'
+            self.initial['estado_reparacion'] = 'pendiente'
         
         # Personalizar el campo de notas
         self.fields['notas'].widget = forms.Textarea(attrs={

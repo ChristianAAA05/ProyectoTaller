@@ -1,4 +1,6 @@
-#!/home/christian/Proyecto/abel_env/bin/python
+#!/bin/sh
+'''exec' "/home/christian/proyecto Py/ProyectoTaller/abel_env/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys

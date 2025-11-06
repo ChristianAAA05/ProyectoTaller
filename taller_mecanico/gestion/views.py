@@ -1,6 +1,6 @@
 from django.forms import formset_factory
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from django.views.generic import ListView
 from django.core.exceptions import ValidationError
@@ -13,6 +13,8 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import datetime, time as dt_time, timedelta
 from django.db.models.functions import TruncMonth
+from io import BytesIO
+import csv
 
 from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
 from .forms import ClienteForm, VehiculoForm, EmpleadoForm, ServicioForm, ReparacionForm, CitaForm
@@ -287,11 +289,26 @@ def crear_reparacion(request):
     if request.method == 'POST':
         form = ReparacionForm(request.POST)
         if form.is_valid():
-            form.save()
+            # Crear la reparación pero no guardar aún
+            reparacion = form.save(commit=False)
+            # Asegurarse de que los campos requeridos tengan valores por defecto si no se proporcionan
+            if not reparacion.condicion_vehiculo:
+                reparacion.condicion_vehiculo = 'regular'
+            if not reparacion.estado_reparacion:
+                reparacion.estado_reparacion = 'pendiente'
+            # Guardar la reparación con los valores por defecto si es necesario
+            reparacion.save()
             messages.success(request, 'Reparación creada correctamente.')
             return redirect('dashboard_reparaciones')
+        else:
+            # Si el formulario no es válido, mostrar errores en la consola para depuración
+            print("Errores del formulario:", form.errors)
     else:
-        form = ReparacionForm()
+        # Inicializar el formulario con valores por defecto
+        form = ReparacionForm(initial={
+            'condicion_vehiculo': 'regular',
+            'estado_reparacion': 'pendiente'
+        })
     return render(request, 'gestion/reparacion_form.html', {'form': form, 'titulo': titulo})
 
 
@@ -318,6 +335,357 @@ def eliminar_reparacion(request, pk):
         messages.success(request, 'Reparación eliminada correctamente.')
         return redirect('dashboard_reparaciones')
     return render(request, 'gestion/reparacion_confirm_delete.html', {'reparacion': reparacion})
+
+# ========== REPORTES ==========
+
+@login_required
+def reportes_ingresos(request):
+    hoy = timezone.now()
+    fecha_desde_str = request.GET.get('fecha_desde')
+    fecha_hasta_str = request.GET.get('fecha_hasta')
+
+    reparaciones = Reparacion.objects.all()
+    fecha_desde = None
+    fecha_hasta = None
+    if fecha_desde_str:
+        try:
+            from datetime import datetime as _dt
+            fecha_desde = _dt.strptime(fecha_desde_str, '%Y-%m-%d').date()
+            reparaciones = reparaciones.filter(fecha_ingreso__date__gte=fecha_desde)
+        except Exception:
+            fecha_desde = None
+    if fecha_hasta_str:
+        try:
+            from datetime import datetime as _dt
+            fecha_hasta = _dt.strptime(fecha_hasta_str, '%Y-%m-%d').date()
+            reparaciones = reparaciones.filter(fecha_ingreso__date__lte=fecha_hasta)
+        except Exception:
+            fecha_hasta = None
+
+    ingresos_qs = (reparaciones
+                   .annotate(m=TruncMonth('fecha_ingreso'))
+                   .values('m')
+                   .annotate(total=Sum('servicio__costo'), cantidad=Count('id'))
+                   .order_by('m'))
+
+    meses_all = [item['m'].strftime('%b %Y') if item['m'] else '' for item in ingresos_qs]
+    ingresos_all = [float(item['total']) if item['total'] is not None else 0.0 for item in ingresos_qs]
+    cantidades_all = [item['cantidad'] for item in ingresos_qs]
+
+    # Si no hay filtros, mostrar últimos 12 meses; si hay filtros, mostrar todo el rango
+    if not fecha_desde_str and not fecha_hasta_str:
+        meses = meses_all[-12:]
+        ingresos = ingresos_all[-12:]
+        cantidades = cantidades_all[-12:]
+    else:
+        meses = meses_all
+        ingresos = ingresos_all
+        cantidades = cantidades_all
+
+    ingresos_totales = sum(ingresos) if ingresos else 0.0
+    promedio_mensual = (ingresos_totales / len(ingresos)) if ingresos else 0.0
+
+    detalles = [
+        {'mes': meses[i], 'total': ingresos[i], 'cantidad': cantidades[i]}
+        for i in range(len(meses))
+    ]
+
+    context = {
+        'titulo': 'Reporte de Ingresos',
+        'hoy': hoy,
+        'meses': meses,
+        'ingresos': ingresos,
+        'ingresos_totales': ingresos_totales,
+        'promedio_mensual': promedio_mensual,
+        'detalles': detalles,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+    }
+    return render(request, 'gestion/reportes_ingresos.html', context)
+
+# Exportar ingresos a Excel con gráfico (xlsxwriter u openpyxl). Fallback a CSV si ninguna está instalada.
+def exportar_ingresos_excel(request):
+    fecha_desde_str = request.GET.get('fecha_desde')
+    fecha_hasta_str = request.GET.get('fecha_hasta')
+    reparaciones = Reparacion.objects.all()
+    
+    # Aplicar filtros de fecha si existen
+    if fecha_desde_str:
+        try:
+            fecha_desde = datetime.strptime(fecha_desde_str, '%Y-%m-%d').date()
+            reparaciones = reparaciones.filter(fecha_ingreso__date__gte=fecha_desde)
+        except ValueError:
+            pass
+    
+    if fecha_hasta_str:
+        try:
+            fecha_hasta = datetime.strptime(fecha_hasta_str, '%Y-%m-%d').date()
+            reparaciones = reparaciones.filter(fecha_ingreso__date__lte=fecha_hasta)
+        except ValueError:
+            pass
+
+    # Obtener datos para el reporte
+    ingresos_qs = (reparaciones
+                  .annotate(m=TruncMonth('fecha_ingreso'))
+                  .values('m')
+                  .annotate(
+                      total=Sum('servicio__costo'),
+                      cantidad=Count('id')
+                  )
+                  .order_by('m'))
+    
+    # Verificar si hay datos para exportar
+    if not ingresos_qs:
+        return JsonResponse({'error': 'No hay datos para exportar'}, status=400)
+    
+    # Procesar datos
+    meses = [item['m'].strftime('%b %Y') if item['m'] else '' for item in ingresos_qs]
+    ingresos = [float(item['total']) if item['total'] is not None else 0.0 for item in ingresos_qs]
+    cantidades = [item['cantidad'] for item in ingresos_qs]
+
+    # Intentar con xlsxwriter (preferido para mejor rendimiento y formato)
+    try:
+        import xlsxwriter
+        output = BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet('Ingresos')
+
+        # Estilos
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#4F81BD',  # Azul corporativo
+            'font_color': 'white',
+            'align': 'center',
+            'valign': 'vcenter',
+            'border': 1,
+            'font_size': 12
+        })
+
+        # Formato para filas pares (gris claro)
+        even_row_format = workbook.add_format({
+            'bg_color': '#F2F2F2',  # Gris muy claro
+            'border': 1,
+            'font_size': 11
+        })
+
+        # Formato para filas impares (blanco)
+        odd_row_format = workbook.add_format({
+            'bg_color': '#FFFFFF',  # Blanco
+            'border': 1,
+            'font_size': 11
+        })
+
+        # Formato para moneda
+        money_format = workbook.add_format({
+            'num_format': '$#,##0.00',
+            'border': 1,
+            'font_size': 11
+        })
+
+        # Formato para celdas de texto
+        text_format = workbook.add_format({
+            'border': 1,
+            'font_size': 11
+        })
+
+        # Ancho de columnas
+        worksheet.set_column('A:A', 20)  # Mes
+        worksheet.set_column('B:B', 25)  # Cantidad
+        worksheet.set_column('C:C', 25)  # Ingresos
+
+        # Escribir encabezados
+        headers = ['Mes', 'Cantidad de Reparaciones', 'Ingresos Totales']
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header, header_format)
+
+        # Escribir datos con formato de filas alternadas
+        for row_num, (mes, cantidad, ingreso) in enumerate(zip(meses, cantidades, ingresos), start=1):
+            # Alternar entre formatos de fila
+            row_format = even_row_format if row_num % 2 == 0 else odd_row_format
+            
+            # Escribir datos
+            worksheet.write(row_num, 0, mes, text_format if row_num % 2 == 1 else text_format)
+            worksheet.write_number(row_num, 1, cantidad, row_format)
+            worksheet.write_number(row_num, 2, ingreso, money_format if ingreso == 0 else money_format)
+
+        # Crear gráfico
+        chart = workbook.add_chart({'type': 'column'})
+        last_row = len(meses)
+        chart.add_series({
+            'name':       'Ingresos',
+            'categories': ['Ingresos', 1, 0, last_row, 0],
+            'values':     ['Ingresos', 1, 2, last_row, 2],
+            'fill':       {'color': '#4F81BD'},  # Mismo azul que el encabezado
+            'border':     {'color': '#4F81BD'}
+        })
+        
+        chart.set_title({'name': 'Ingresos por Mes'})
+        chart.set_x_axis({'name': 'Mes'})
+        chart.set_y_axis({
+            'name': 'Ingresos ($)',
+            'num_format': '$#,##0'
+        })
+        chart.set_legend({'position': 'none'})  # Ocultar leyenda ya que solo hay una serie
+        
+        # Insertar gráfico en la hoja
+        worksheet.insert_chart('E2', chart, {
+            'x_offset': 25, 
+            'y_offset': 10,
+            'x_scale': 1.5,
+            'y_scale': 1.5
+        })
+
+        # Añadir filtros si se aplicaron fechas
+        if fecha_desde_str or fecha_hasta_str:
+            filtro_text = "Filtro aplicado: "
+            if fecha_desde_str:
+                filtro_text += f"Desde {fecha_desde_str}"
+            if fecha_hasta_str:
+                if fecha_desde_str:
+                    filtro_text += " - "
+                filtro_text += f"Hasta {fecha_hasta_str}"
+            
+            # Escribir texto del filtro
+            worksheet.merge_range(f'E{last_row + 3}:H{last_row + 3}', filtro_text, workbook.add_format({
+                'italic': True,
+                'font_color': '#666666',
+                'font_size': 10
+            }))
+
+        # Cerrar el libro
+        workbook.close()
+        output.seek(0)
+
+        # Crear la respuesta
+        filename = f"reporte_ingresos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
+
+    except ImportError:
+        # Si xlsxwriter no está disponible, intentar con openpyxl
+        try:
+            from openpyxl import Workbook
+            from openpyxl.chart import BarChart, Reference
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+
+            output = BytesIO()
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Ingresos"
+
+            # Estilos
+            header_fill = PatternFill(start_color='4F81BD', end_color='4F81BD', fill_type='solid')
+            header_font = Font(color='FFFFFF', bold=True, size=12)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+            # Encabezados
+            headers = ['Mes', 'Cantidad de Reparaciones', 'Ingresos Totales']
+            for col_num, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_num, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Datos
+            for row_num, (mes, cantidad, ingreso) in enumerate(zip(meses, cantidades, ingresos), start=2):
+                # Alternar colores de fila
+                if row_num % 2 == 0:
+                    fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+                else:
+                    fill = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+                
+                # Escribir celdas
+                ws.cell(row=row_num, column=1, value=mes).fill = fill
+                ws.cell(row=row_num, column=2, value=cantidad).fill = fill
+                cell_ingreso = ws.cell(row=row_num, column=3, value=ingreso)
+                cell_ingreso.number_format = '$#,##0.00'
+                cell_ingreso.fill = fill
+                
+                # Aplicar bordes
+                for col in range(1, 4):
+                    ws.cell(row=row_num, column=col).border = border
+
+            # Ajustar ancho de columnas
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column].width = adjusted_width
+
+            # Crear gráfico
+            chart = BarChart()
+            chart.title = 'Ingresos por Mes'
+            chart.x_axis.title = 'Mes'
+            chart.y_axis.title = 'Ingresos ($)'
+
+            data = Reference(ws, min_col=3, min_row=1, max_row=len(meses)+1, max_col=3)
+            cats = Reference(ws, min_col=1, min_row=2, max_row=len(meses)+1)
+            chart.add_data(data, titles_from_data=True)
+            chart.set_categories(cats)
+            
+            # Personalizar el gráfico
+            chart.series[0].graphicalProperties.solidFill = '4F81BD'  # Mismo azul que el encabezado
+            chart.series[0].graphicalProperties.line.solidFill = '4F81BD'
+            
+            # Añadir el gráfico a la hoja
+            ws.add_chart(chart, 'E2')
+
+            # Añadir filtros si se aplicaron fechas
+            if fecha_desde_str or fecha_hasta_str:
+                filtro_text = "Filtro aplicado: "
+                if fecha_desde_str:
+                    filtro_text += f"Desde {fecha_desde_str}"
+                if fecha_hasta_str:
+                    if fecha_desde_str:
+                        filtro_text += " - "
+                    filtro_text += f"Hasta {fecha_hasta_str}"
+                
+                # Escribir texto del filtro
+                ws.merge_cells(f'E{len(meses)+3}:H{len(meses)+3}')
+                cell_filtro = ws.cell(row=len(meses)+3, column=5, value=filtro_text)
+                cell_filtro.font = Font(italic=True, color='666666', size=10)
+
+            # Guardar el libro
+            wb.save(output)
+            output.seek(0)
+
+            # Crear la respuesta
+            filename = f"reporte_ingresos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            response = HttpResponse(
+                output,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
+
+        except ImportError:
+            # Si no hay bibliotecas de Excel, usar CSV como último recurso
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename=reporte_ingresos_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+
+            writer = csv.writer(response)
+            writer.writerow(['Mes', 'Cantidad Reparaciones', 'Ingresos'])
+            for mes, cantidad, ingreso in zip(meses, cantidades, ingresos):
+                writer.writerow([mes, cantidad, f'${ingreso:,.2f}'])
+
+            return response
 
 # ========== CLIENTES (CRUD con templates) ==========
 

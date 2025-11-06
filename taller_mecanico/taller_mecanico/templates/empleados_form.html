@@ -41,6 +41,17 @@
                             <div class="col-md-6 mb-3">
                                 {{ form.puesto.label_tag }}
                                 {{ form.puesto }}
+                                <datalist id="puestos-sugeridos">
+                                    <option value="Mecánico">
+                                    <option value="Jefe de Taller">
+                                    <option value="Recepcionista">
+                                    <option value="Auxiliar Mecánico">
+                                    <option value="Auxiliar de Taller">
+                                    <option value="Asesor de Servicio">
+                                    <option value="Encargado de Repuestos">
+                                    <option value="Lavador de Vehículos">
+                                </datalist>
+                                <small class="form-text text-muted">Escriba o seleccione un puesto de la lista</small>
                                 {% if form.puesto.errors %}
                                     <div class="text-danger">
                                         {{ form.puesto.errors.0 }}
