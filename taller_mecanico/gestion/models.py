@@ -19,6 +19,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 
 # Modelo de Perfil de usuario personalizado
 # Extiende el modelo User de Django con información adicional específica del taller
@@ -254,6 +255,40 @@ class Registro(models.Model):
     class Meta:
         verbose_name = "Registro"
         verbose_name_plural = "Registros"
+
+class Tarea(models.Model):
+    """
+    Modelo para gestionar tareas del personal del taller.
+    """
+    ESTADOS_TAREA = [
+        ('por_hacer', 'Por Hacer'),
+        ('en_progreso', 'En Progreso'),
+        ('completada', 'Completada'),
+    ]
+
+    PRIORIDAD_CHOICES = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+    ]
+
+    titulo = models.CharField(max_length=200)
+    descripcion = models.TextField(blank=True, null=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS_TAREA, default='por_hacer')
+    prioridad = models.CharField(max_length=10, choices=PRIORIDAD_CHOICES, default='media')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_limite = models.DateField(null=True, blank=True)
+    creada_por = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tareas_creadas')
+    asignada_a = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tareas_asignadas')
+    etiqueta = models.CharField(max_length=50, blank=True, null=True)
+
+    def __str__(self):
+        return self.titulo
+
+    class Meta:
+        verbose_name = 'Tarea'
+        verbose_name_plural = 'Tareas'
+        ordering = ['-fecha_creacion']
 
 # ========== SIGNALS Y AUTOMATIZACIÓN ==========
 

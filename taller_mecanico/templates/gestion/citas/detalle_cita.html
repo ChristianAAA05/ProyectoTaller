@@ -1,0 +1,69 @@
+{% extends 'gestion/base_dashboard.html' %}
+
+{% block title %}{{ titulo }} - Taller Mecánico{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">{{ titulo }}</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard_encargado' %}">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'lista_citas' %}">Citas</a></li>
+        <li class="breadcrumb-item active">Detalle</li>
+    </ol>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-calendar-day me-1"></i>
+            Información de la Cita
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h5>Cliente</h5>
+                    <p class="mb-0">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</p>
+                    <p class="text-muted mb-0">Teléfono: {{ cita.cliente.telefono }}</p>
+                    <p class="text-muted">Email: {{ cita.cliente.email|default:"No especificado" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Vehículo</h5>
+                    <p class="mb-0">{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}</p>
+                    <p class="text-muted mb-0">Año: {{ cita.vehiculo.anio }}</p>
+                    <p class="text-muted">Placa: {{ cita.vehiculo.placa }}</p>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h5>Servicio</h5>
+                    <p class="mb-0">{{ cita.servicio.nombre }}</p>
+                    <p class="text-muted">Duración: {{ cita.servicio.duracion }} minutos</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Fecha y Hora</h5>
+                    <p class="mb-0">{{ cita.fecha|date:"l, d F Y" }}</p>
+                    <p class="text-muted">{{ cita.hora|time:"H:i" }} hs</p>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <h5>Notas Adicionales</h5>
+                    <p class="text-muted">{{ cita.notas|default:"Sin notas adicionales" }}</p>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <a href="{% url 'editar_cita' cita.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit me-1"></i> Editar Cita
+                </a>
+                <a href="{% url 'eliminar_cita' cita.id %}" class="btn btn-danger">
+                    <i class="fas fa-trash-alt me-1"></i> Eliminar Cita
+                </a>
+                <a href="{% url 'lista_citas' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Volver al Listado
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

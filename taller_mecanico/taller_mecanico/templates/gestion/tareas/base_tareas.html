@@ -1,0 +1,102 @@
+{% extends 'gestion/base.html' %}
+
+{% block extra_css %}
+<style>
+    .task-card {
+        transition: all 0.3s ease;
+        margin-bottom: 15px;
+        border-left: 4px solid #6c757d;
+    }
+    .task-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+    .task-priority-high {
+        border-left-color: #dc3545;
+    }
+    .task-priority-medium {
+        border-left-color: #ffc107;
+    }
+    .task-priority-low {
+        border-left-color: #28a745;
+    }
+    .task-status-todo {
+        background-color: #f8f9fa;
+    }
+    .task-status-in-progress {
+        background-color: #e2f0fd;
+    }
+    .task-status-done {
+        background-color: #e8f5e9;
+    }
+    .task-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{% block titulo_pagina %}{% endblock %}</h1>
+        <div class="d-flex">
+            {% block acciones_adicionales %}{% endblock %}
+            <a href="{% url 'lista_tareas' %}" class="btn btn-secondary btn-sm ml-2">
+                <i class="fas fa-arrow-left fa-sm"></i> Volver al listado
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block contenido_tareas %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Función para cambiar el estado de una tarea mediante AJAX
+function cambiarEstadoTarea(tareaId, nuevoEstado) {
+    fetch(`/tareas/cambiar-estado/${tareaId}/${nuevoEstado}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFTTOKEN': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recargar la página para ver los cambios
+            window.location.reload();
+        } else {
+            alert('Error al actualizar el estado de la tarea: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al conectar con el servidor');
+    });
+}
+
+// Inicializar tooltips de Bootstrap
+$(function () {
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

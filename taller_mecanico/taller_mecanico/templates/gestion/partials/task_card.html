@@ -1,0 +1,216 @@
+{% load static %}
+
+<script>
+// Debug function
+console.log('Task card loaded for task ID:', {{ tarea.id }});
+
+function cambiarEstadoTarea(tareaId, nuevoEstado, event) {
+    console.log('cambiarEstadoTarea called with:', {tareaId, nuevoEstado, event});
+    
+    // Prevent default form submission if called from a button
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    console.log('CSRF Token:', csrftoken);
+    
+    const button = event?.currentTarget;
+    let originalHTML = '';
+    
+    if (button) {
+        originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    }
+    
+    const url = `/tareas/cambiar-estado/${tareaId}/${nuevoEstado}/`;
+    console.log('Making request to:', url);
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({})
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            return response.text().then(text => { 
+                console.error('Error response text:', text);
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error(text || 'Error en la petición');
+                }
+            }).then(data => {
+                throw new Error(data.error || 'Error en la petición');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Success:', data);
+        if (data && data.success) {
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
+            alertDiv.role = 'alert';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.innerHTML = `
+                <strong>¡Éxito!</strong> Tarea actualizada correctamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            // Auto-remove alert after 3 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+            
+            // Reload the page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        } else {
+            throw new Error(data?.error || 'Error desconocido al actualizar la tarea');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        
+        // Show error message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 end-0 m-3';
+        alertDiv.role = 'alert';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            <strong>Error:</strong> ${error.message || 'Error al actualizar la tarea'}.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        // Auto-remove alert after 5 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    })
+    .finally(() => {
+        if (button && originalHTML) {
+            button.disabled = false;
+            button.innerHTML = originalHTML;
+        }
+    });
+}
+
+// Make the function available globally
+window.cambiarEstadoTarea = cambiarEstadoTarea;
+</script>
+
+<div class="card mb-2 border-0 shadow-sm task-item" data-task-id="{{ tarea.id }}" style="font-size: 0.85rem;">
+    <div class="card-body p-2">
+        <div class="d-flex justify-content-between align-items-start">
+            <h6 class="mb-1">
+                <a href="{% url 'editar_tarea' tarea.id %}" class="{% if tarea.estado == 'completada' %}text-muted text-decoration-line-through{% else %}text-dark{% endif %}">
+                    {{ tarea.titulo }}
+                </a>
+            </h6>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-link text-muted p-0" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'editar_tarea' tarea.id %}">Editar</a></li>
+                    <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#eliminarTareaModal{{ tarea.id }}">Eliminar</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        {% if tarea.descripcion %}
+        <p class="small text-muted mb-2">{{ tarea.descripcion|truncatechars:80 }}</p>
+        {% endif %}
+        
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                {% if tarea.fecha_limite %}
+                <span class="badge bg-light text-dark small">
+                    <i class="far fa-clock me-1"></i> {{ tarea.fecha_limite|date:"d/m/Y" }}
+                </span>
+                {% endif %}
+                
+                {% if tarea.prioridad == 'alta' %}
+                    <span class="badge bg-danger small">Alta prioridad</span>
+                {% elif tarea.prioridad == 'media' %}
+                    <span class="badge bg-warning text-dark small">Media prioridad</span>
+                {% else %}
+                    <span class="badge bg-success small">Baja prioridad</span>
+                {% endif %}
+            </div>
+            
+            <div class="btn-group">
+                {% if estado == 'por_hacer' %}
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'en_progreso', event)" 
+                            title="Mover a En Progreso">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                {% elif estado == 'en_progreso' %}
+                    <button class="btn btn-sm btn-outline-success me-1" 
+                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'completada', event)" 
+                            title="Marcar como Completada">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" 
+                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'por_hacer', event)" 
+                            title="Mover a Por Hacer">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación para eliminar tarea -->
+<div class="modal fade" id="eliminarTareaModal{{ tarea.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que deseas eliminar la tarea "{{ tarea.titulo }}"?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form action="{% url 'eliminar_tarea' tarea.id %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

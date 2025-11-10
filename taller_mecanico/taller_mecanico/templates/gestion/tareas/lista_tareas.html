@@ -1,0 +1,355 @@
+{% extends 'gestion/tareas/base_tareas.html' %}
+
+{% block titulo_pagina %}Gestión de Tareas{% endblock %}
+
+{% block acciones_adicionales %}
+<a href="{% url 'crear_tarea' %}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus fa-sm"></i> Nueva Tarea
+</a>
+{% endblock %}
+
+{% block contenido_tareas %}
+<div class="row">
+    <!-- Columna: Por Hacer -->
+    <div class="col-md-4 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Por Hacer</h6>
+                <span class="badge badge-primary badge-pill">{{ tareas_por_hacer|length }}</span>
+            </div>
+            <div class="card-body" style="min-height: 200px; max-height: 600px; overflow-y: auto;">
+                {% for tarea in tareas_por_hacer %}
+                <div class="card task-card mb-3 task-status-todo task-priority-{{ tarea.prioridad }}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="card-title mb-1">
+                                <a href="{% url 'editar_tarea' tarea.id %}" class="text-dark">
+                                    {{ tarea.titulo }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                                    <a class="dropdown-item" href="{% url 'editar_tarea' tarea.id %}">
+                                        <i class="fas fa-edit fa-fw mr-1"></i> Editar
+                                    </a>
+                                    <a class="dropdown-item text-danger" href="#" data-toggle="modal" data-target="#eliminarTareaModal{{ tarea.id }}">
+                                        <i class="fas fa-trash-alt fa-fw mr-1"></i> Eliminar
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <button class="dropdown-item" onclick="cambiarEstadoTarea({{ tarea.id }}, 'en_progreso')">
+                                        <i class="fas fa-arrow-right fa-fw mr-1"></i> Mover a En Progreso
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if tarea.descripcion %}
+                        <p class="card-text small text-muted mb-2">{{ tarea.descripcion|truncatechars:100 }}</p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if tarea.etiqueta %}
+                                <span class="badge badge-info">{{ tarea.etiqueta }}</span>
+                                {% endif %}
+                                {% with prioridad=tarea.get_prioridad_display|lower %}
+                                <span class="badge 
+                                    {% if prioridad == 'alta' %}
+                                        badge-danger
+                                    {% elif prioridad == 'media' %}
+                                        badge-warning
+                                    {% else %}
+                                        badge-success
+                                    {% endif %}">
+                                    {{ tarea.get_prioridad_display }}
+                                </span>
+                                {% endwith %}
+                            </div>
+                            <small class="text-muted">
+                                {% if tarea.fecha_limite %}
+                                <i class="far fa-calendar-alt"></i> {{ tarea.fecha_limite|date:"d/m/Y" }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                {% if tarea.asignada_a %}
+                                <i class="fas fa-user"></i> {{ tarea.asignada_a.get_full_name|default:tarea.asignada_a.username }}
+                                {% else %}
+                                <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Sin asignar</span>
+                                {% endif %}
+                            </small>
+                            <small class="text-muted">
+                                {{ tarea.fecha_creacion|timesince }} atrás
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal de confirmación para eliminar tarea -->
+                <div class="modal fade" id="eliminarTareaModal{{ tarea.id }}" tabindex="-1" role="dialog" aria-labelledby="eliminarTareaModalLabel{{ tarea.id }}" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="eliminarTareaModalLabel{{ tarea.id }}">Confirmar eliminación</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                ¿Estás seguro de que deseas eliminar la tarea "{{ tarea.titulo }}"?
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                <form action="{% url 'eliminar_tarea' tarea.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-tasks fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-muted">No hay tareas pendientes</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna: En Progreso -->
+    <div class="col-md-4 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-warning">En Progreso</h6>
+                <span class="badge badge-warning badge-pill">{{ tareas_en_progreso|length }}</span>
+            </div>
+            <div class="card-body" style="min-height: 200px; max-height: 600px; overflow-y: auto;">
+                {% for tarea in tareas_en_progreso %}
+                <div class="card task-card mb-3 task-status-in-progress task-priority-{{ tarea.prioridad }}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="card-title mb-1">
+                                <a href="{% url 'editar_tarea' tarea.id %}" class="text-dark">
+                                    {{ tarea.titulo }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                                    <a class="dropdown-item" href="{% url 'editar_tarea' tarea.id %}">
+                                        <i class="fas fa-edit fa-fw mr-1"></i> Editar
+                                    </a>
+                                    <a class="dropdown-item text-danger" href="#" data-toggle="modal" data-target="#eliminarTareaModal{{ tarea.id }}">
+                                        <i class="fas fa-trash-alt fa-fw mr-1"></i> Eliminar
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <button class="dropdown-item" onclick="cambiarEstadoTarea({{ tarea.id }}, 'completada')">
+                                        <i class="fas fa-check fa-fw mr-1"></i> Marcar como Completada
+                                    </button>
+                                    <button class="dropdown-item" onclick="cambiarEstadoTarea({{ tarea.id }}, 'por_hacer')">
+                                        <i class="fas fa-arrow-left fa-fw mr-1"></i> Volver a Por Hacer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if tarea.descripcion %}
+                        <p class="card-text small text-muted mb-2">{{ tarea.descripcion|truncatechars:100 }}</p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if tarea.etiqueta %}
+                                <span class="badge badge-info">{{ tarea.etiqueta }}</span>
+                                {% endif %}
+                                {% with prioridad=tarea.get_prioridad_display|lower %}
+                                <span class="badge 
+                                    {% if prioridad == 'alta' %}
+                                        badge-danger
+                                    {% elif prioridad == 'media' %}
+                                        badge-warning
+                                    {% else %}
+                                        badge-success
+                                    {% endif %}">
+                                    {{ tarea.get_prioridad_display }}
+                                </span>
+                                {% endwith %}
+                            </div>
+                            <small class="text-muted">
+                                {% if tarea.fecha_limite %}
+                                <i class="far fa-calendar-alt"></i> {{ tarea.fecha_limite|date:"d/m/Y" }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                {% if tarea.asignada_a %}
+                                <i class="fas fa-user"></i> {{ tarea.asignada_a.get_full_name|default:tarea.asignada_a.username }}
+                                {% else %}
+                                <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Sin asignar</span>
+                                {% endif %}
+                            </small>
+                            <small class="text-muted">
+                                {{ tarea.fecha_creacion|timesince }} atrás
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal de confirmación para eliminar tarea -->
+                <div class="modal fade" id="eliminarTareaModal{{ tarea.id }}" tabindex="-1" role="dialog" aria-labelledby="eliminarTareaModalLabel{{ tarea.id }}" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="eliminarTareaModalLabel{{ tarea.id }}">Confirmar eliminación</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                ¿Estás seguro de que deseas eliminar la tarea "{{ tarea.titulo }}"?
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                <form action="{% url 'eliminar_tarea' tarea.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-tools fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-muted">No hay tareas en progreso</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna: Completadas -->
+    <div class="col-md-4 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-success">Completadas</h6>
+                <span class="badge badge-success badge-pill">{{ tareas_completadas|length }}</span>
+            </div>
+            <div class="card-body" style="min-height: 200px; max-height: 600px; overflow-y: auto;">
+                {% for tarea in tareas_completadas %}
+                <div class="card task-card mb-3 task-status-done">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="card-title mb-1">
+                                <a href="{% url 'editar_tarea' tarea.id %}" class="text-dark">
+                                    {{ tarea.titulo }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                                    <a class="dropdown-item" href="{% url 'editar_tarea' tarea.id %}">
+                                        <i class="fas fa-edit fa-fw mr-1"></i> Editar
+                                    </a>
+                                    <a class="dropdown-item text-danger" href="#" data-toggle="modal" data-target="#eliminarTareaModal{{ tarea.id }}">
+                                        <i class="fas fa-trash-alt fa-fw mr-1"></i> Eliminar
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <button class="dropdown-item" onclick="cambiarEstadoTarea({{ tarea.id }}, 'en_progreso')">
+                                        <i class="fas fa-undo fa-fw mr-1"></i> Volver a En Progreso
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if tarea.descripcion %}
+                        <p class="card-text small text-muted mb-2">{{ tarea.descripcion|truncatechars:100 }}</p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if tarea.etiqueta %}
+                                <span class="badge badge-info">{{ tarea.etiqueta }}</span>
+                                {% endif %}
+                                {% with prioridad=tarea.get_prioridad_display|lower %}
+                                <span class="badge 
+                                    {% if prioridad == 'alta' %}
+                                        badge-danger
+                                    {% elif prioridad == 'media' %}
+                                        badge-warning
+                                    {% else %}
+                                        badge-success
+                                    {% endif %}">
+                                    {{ tarea.get_prioridad_display }}
+                                </span>
+                                {% endwith %}
+                            </div>
+                            <small class="text-muted">
+                                {% if tarea.fecha_limite %}
+                                <i class="far fa-calendar-alt"></i> {{ tarea.fecha_limite|date:"d/m/Y" }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                {% if tarea.asignada_a %}
+                                <i class="fas fa-user"></i> {{ tarea.asignada_a.get_full_name|default:tarea.asignada_a.username }}
+                                {% else %}
+                                <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Sin asignar</span>
+                                {% endif %}
+                            </small>
+                            <small class="text-muted">
+                                Completada hace {{ tarea.fecha_actualizacion|timesince }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal de confirmación para eliminar tarea -->
+                <div class="modal fade" id="eliminarTareaModal{{ tarea.id }}" tabindex="-1" role="dialog" aria-labelledby="eliminarTareaModalLabel{{ tarea.id }}" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="eliminarTareaModalLabel{{ tarea.id }}">Confirmar eliminación</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                ¿Estás seguro de que deseas eliminar la tarea "{{ tarea.titulo }}"?
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                <form action="{% url 'eliminar_tarea' tarea.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-check-circle fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-muted">No hay tareas completadas</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

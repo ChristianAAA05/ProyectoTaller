@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from django.views.generic import ListView
+from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q, Sum
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -14,10 +15,11 @@ from django.utils import timezone
 from datetime import datetime, time as dt_time, timedelta
 from django.db.models.functions import TruncMonth
 from io import BytesIO
+from django.views.decorators.http import require_POST
 import csv
 
-from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro
-from .forms import ClienteForm, VehiculoForm, EmpleadoForm, ServicioForm, ReparacionForm, CitaForm
+from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro, Tarea
+from .forms import ClienteForm, VehiculoForm, EmpleadoForm, ServicioForm, ReparacionForm, CitaForm, TareaForm
 from .decorators import es_jefe, es_encargado, puede_gestionar_empleados, puede_gestionar_servicios
 
 # Importaciones para la API REST
@@ -61,10 +63,151 @@ def perfil_view(request):
 
 
 @login_required
+def listar_tareas(request):
+    """
+    Vista para listar todas las tareas del usuario.
+    """
+    # Obtener tareas según el rol del usuario
+    if request.user.profile.es_empleado:
+        # Si es empleado, mostrar sus tareas asignadas y las que creó
+        tareas = Tarea.objects.filter(
+            Q(asignada_a=request.user) | Q(creada_por=request.user)
+        ).distinct().order_by('fecha_limite', 'prioridad')
+    else:
+        # Si es jefe o admin, mostrar todas las tareas
+        tareas = Tarea.objects.all().order_by('fecha_limite', 'prioridad')
+    
+    # Separar tareas por estado
+    tareas_por_hacer = tareas.filter(estado='por_hacer')
+    tareas_en_progreso = tareas.filter(estado='en_progreso')
+    tareas_completadas = tareas.filter(estado='completada')
+    
+    context = {
+        'tareas_por_hacer': tareas_por_hacer,
+        'tareas_en_progreso': tareas_en_progreso,
+        'tareas_completadas': tareas_completadas,
+    }
+    
+    return render(request, 'gestion/tareas/lista_tareas.html', context)
+
+def crear_tarea(request):
+    """
+    Vista para crear una nueva tarea.
+    """
+    if request.method == 'POST':
+        form = TareaForm(request.POST, user=request.user)
+        if form.is_valid():
+            tarea = form.save(commit=False)
+            tarea.creada_por = request.user
+            tarea.save()
+            messages.success(request, 'Tarea creada exitosamente.')
+            return redirect('lista_tareas')
+    else:
+        form = TareaForm(user=request.user)
+    
+    return render(request, 'gestion/tareas/crear_tarea.html', {'form': form})
+
+def editar_tarea(request, tarea_id):
+    """
+    Vista para editar una tarea existente.
+    """
+    tarea = get_object_or_404(Tarea, id=tarea_id)
+    
+    # Verificar permisos
+    if not (request.user == tarea.creada_por or request.user == tarea.asignada_a or request.user.is_superuser):
+        messages.error(request, 'No tienes permiso para editar esta tarea.')
+        return redirect('lista_tareas')
+    
+    if request.method == 'POST':
+        form = TareaForm(request.POST, instance=tarea, user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Tarea actualizada exitosamente.')
+            return redirect('lista_tareas')
+    else:
+        form = TareaForm(instance=tarea, user=request.user)
+    
+    return render(request, 'gestion/tareas/editar_tarea.html', {'form': form, 'tarea': tarea})
+
+@require_POST
+def eliminar_tarea(request, tarea_id):
+    """
+    Vista para eliminar una tarea.
+    """
+    tarea = get_object_or_404(Tarea, id=tarea_id)
+    
+    # Verificar permisos
+    if not (request.user == tarea.creada_por or request.user.is_superuser):
+        messages.error(request, 'No tienes permiso para eliminar esta tarea.')
+        return redirect('lista_tareas')
+    
+    tarea.delete()
+    messages.success(request, 'Tarea eliminada exitosamente.')
+    return redirect('lista_tareas')
+
+import logging
+logger = logging.getLogger(__name__)
+
+@require_http_methods(["POST"])
+def cambiar_estado_tarea(request, tarea_id, nuevo_estado):
+    """
+    Vista para cambiar el estado de una tarea mediante AJAX.
+    """
+    logger.info(f'Cambiando estado de tarea {tarea_id} a {nuevo_estado}')
+    
+    try:
+        tarea = get_object_or_404(Tarea, id=tarea_id)
+        logger.debug(f'Tarea encontrada: {tarea}')
+        
+        # Verificar permisos
+        if not (request.user == tarea.creada_por or request.user == tarea.asignada_a or request.user.is_superuser):
+            error_msg = f'Usuario {request.user} no tiene permiso para modificar la tarea {tarea_id}'
+            logger.warning(error_msg)
+            return JsonResponse(
+                {'success': False, 'error': 'No tienes permiso para modificar esta tarea.'}, 
+                status=403
+            )
+        
+        # Validar el nuevo estado
+        estados_validos = dict(Tarea.ESTADOS_TAREA).keys()
+        if nuevo_estado not in estados_validos:
+            error_msg = f'Estado {nuevo_estado} no válido. Estados válidos: {estados_validos}'
+            logger.warning(error_msg)
+            return JsonResponse(
+                {'success': False, 'error': 'Estado no válido.'}, 
+                status=400
+            )
+        
+        # Actualizar el estado
+        logger.debug(f'Actualizando tarea {tarea_id} de {tarea.estado} a {nuevo_estado}')
+        tarea.estado = nuevo_estado
+        tarea.save()
+        
+        logger.info(f'Tarea {tarea_id} actualizada exitosamente a {nuevo_estado}')
+        return JsonResponse({
+            'success': True, 
+            'nuevo_estado': tarea.get_estado_display(),
+            'tarea_id': tarea.id,
+            'estado_anterior': tarea.estado,
+            'estado_nuevo': nuevo_estado
+        })
+        
+    except Exception as e:
+        logger.error(f'Error al cambiar estado de tarea {tarea_id}: {str(e)}', exc_info=True)
+        return JsonResponse(
+            {'success': False, 'error': f'Error interno del servidor: {str(e)}'}, 
+            status=500
+        )
+
+@login_required
 def inicio(request):
-    # Redirigir a panel del jefe si corresponde
+    # Redirigir según el rol del usuario
     if es_jefe(request.user):
         return redirect('dashboard_jefe')
+    elif es_encargado(request.user):
+        return redirect('dashboard_encargado')
+        
+    # Si no es ni jefe ni encargado, mostrar dashboard básico
     total_clientes = Cliente.objects.count()
     total_empleados = Empleado.objects.count()
     total_servicios = Servicio.objects.count()
@@ -88,8 +231,43 @@ def not_implemented_view(request, *args, **kwargs):
     messages.info(request, 'Funcionalidad en desarrollo.')
     return redirect('inicio')
 
-# Alias temporales para dashboards aún no implementados
-dashboard_encargado = not_implemented_view
+@login_required
+def dashboard_encargado(request):
+    """
+    Vista del dashboard para el rol de encargado.
+    Muestra información relevante para el seguimiento de tareas diarias.
+    """
+    # Obtener citas de hoy
+    hoy = timezone.now().date()
+    citas_hoy = Agenda.objects.filter(fecha=hoy).select_related('cliente', 'servicio')
+    
+    # Obtener reparaciones en progreso
+    reparaciones_en_progreso = Reparacion.objects.filter(
+        estado_reparacion='en_progreso'
+    ).select_related('vehiculo__cliente')
+    
+    # Obtener próximas citas (próximos 7 días)
+    fecha_fin = hoy + timezone.timedelta(days=7)
+    proximas_citas = Agenda.objects.filter(
+        fecha__range=[hoy, fecha_fin]
+    ).exclude(fecha=hoy).select_related('cliente', 'servicio').order_by('fecha', 'hora')
+    
+    # Obtener tareas para el dashboard
+    tareas = Tarea.objects.all()
+    tareas_por_hacer = tareas.filter(estado='por_hacer').order_by('-fecha_creacion')[:5]
+    tareas_en_progreso = tareas.filter(estado='en_progreso').order_by('-fecha_creacion')[:5]
+    tareas_completadas = tareas.filter(estado='completada').order_by('-fecha_creacion')[:5]
+    
+    context = {
+        'citas_hoy': citas_hoy,
+        'reparaciones_en_progreso': reparaciones_en_progreso,
+        'proximas_citas': proximas_citas,
+        'tareas_por_hacer': tareas_por_hacer,
+        'tareas_en_progreso': tareas_en_progreso,
+        'tareas_completadas': tareas_completadas,
+    }
+    
+    return render(request, 'gestion/dashboard_encargado.html', context)
 
 
 @login_required
@@ -1042,6 +1220,15 @@ def editar_cita(request, pk):
     return render(request, 'gestion/citas/editar_cita.html', {
         'titulo': 'Editar Cita',
         'form': form,
+        'cita': cita
+    })
+
+@login_required
+def detalle_cita(request, pk):
+    """Vista para mostrar los detalles de una cita"""
+    cita = get_object_or_404(Agenda, pk=pk)
+    return render(request, 'gestion/citas/detalle_cita.html', {
+        'titulo': 'Detalle de Cita',
         'cita': cita
     })
 

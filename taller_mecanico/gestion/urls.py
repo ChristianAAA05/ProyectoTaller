@@ -103,6 +103,21 @@ urlpatterns = [
     path('empleados/editar/<int:pk>/', views.empleados_editar, name='empleados-editar'),  # Formulario para editar empleado
     path('empleados/eliminar/<int:pk>/', views.empleados_eliminar, name='empleados-eliminar'),  # Confirmación para eliminar empleado
 
+    # ========== GESTIÓN DE CITAS ==========
+    path('citas/', views.lista_citas, name='lista_citas'),
+    path('citas/nueva/', views.crear_cita, name='crear_cita'),
+    path('citas/editar/<int:pk>/', views.editar_cita, name='editar_cita'),
+    path('citas/eliminar/<int:pk>/', views.eliminar_cita, name='eliminar_cita'),
+    path('citas/agregar/', views.crear_cita, name='agregar_cita'),  # Alias para consistencia
+    path('citas/<int:pk>/', views.detalle_cita, name='detalle_cita'),  # Vista detallada de cita
+    
+    # ========== GESTIÓN DE TAREAS ==========
+    path('tareas/', views.listar_tareas, name='lista_tareas'),
+    path('tareas/crear/', views.crear_tarea, name='crear_tarea'),
+    path('tareas/editar/<int:tarea_id>/', views.editar_tarea, name='editar_tarea'),
+    path('tareas/eliminar/<int:tarea_id>/', views.eliminar_tarea, name='eliminar_tarea'),
+    path('tareas/cambiar-estado/<int:tarea_id>/<str:nuevo_estado>/', views.cambiar_estado_tarea, name='cambiar_estado_tarea'),
+    
     # ========== GESTIÓN DE SERVICIOS ==========
     path('servicios/lista/', views.servicios_lista, name='servicios-lista'),          # Listar todos los servicios
     path('servicios/crear/', views.servicios_crear, name='servicios-crear'),           # Formulario para crear servicio

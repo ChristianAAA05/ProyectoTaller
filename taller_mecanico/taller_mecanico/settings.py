@@ -70,7 +70,10 @@ ROOT_URLCONF = 'taller_mecanico.urls'  # Archivo principal de URLs
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'taller_mecanico' / 'templates'],  # Directorio de templates
+        'DIRS': [
+            BASE_DIR / 'templates',  # Para templates globales en la raíz del proyecto
+            BASE_DIR / 'taller_mecanico' / 'templates'  # Para templates en la app principal
+        ],
         'APP_DIRS': True,  # Buscar templates en directorios de apps
         'OPTIONS': {
             'context_processors': [

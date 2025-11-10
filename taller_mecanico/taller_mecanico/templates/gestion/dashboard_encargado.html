@@ -1,315 +1,238 @@
 {% extends 'gestion/base_dashboard.html' %}
 
+{% block extra_css %}
+<style>
+    .card-dashboard {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .card-dashboard:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    }
+    .kpi-card {
+        border-left: 4px solid #4e73df;
+    }
+    .kpi-card.warning {
+        border-left-color: #f6c23e;
+    }
+    .kpi-card.success {
+        border-left-color: #1cc88a;
+    }
+    .kpi-card.danger {
+        border-left-color: #e74a3b;
+    }
+    .kpi-icon {
+        font-size: 1.5rem;
+        opacity: 0.3;
+    }
+    .task-item {
+        cursor: move;
+        transition: all 0.2s;
+    }
+    .task-item:hover {
+        transform: translateX(2px);
+    }
+    .task-column {
+        min-height: 100px;
+    }
+</style>
+{% endblock %}
+
 {% block dashboard_content %}
-<div class="row">
-    <!-- Citas de Hoy -->
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="card-title mb-0">Citas para Hoy</h6>
-                <span class="badge bg-primary rounded-pill">{{ citas_hoy|length }}</span>
-            </div>
-            <div class="card-body p-0">
-                {% if citas_hoy %}
-                <div class="list-group list-group-flush">
-                    {% for cita in citas_hoy %}
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</h6>
-                            <small>{{ cita.hora|time:"H:i" }}</small>
-                        </div>
-                        <p class="mb-1">
-                            <i class="fas fa-tools me-1"></i> {{ cita.servicio.nombre_servicio }}
-                        </p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
-                                <i class="fas fa-car me-1"></i> {{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}
-                            </small>
-                            <span class="badge bg-{{ cita.estado|lower }}">
-                                {{ cita.estado }}
-                            </span>
-                        </div>
+<!-- Sección de KPIs -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2 kpi-card">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Citas Hoy</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ citas_hoy|length }}</div>
                     </div>
-                    {% endfor %}
+                    <div class="col-auto">
+                        <i class="fas fa-calendar-day fa-2x text-gray-300"></i>
+                    </div>
                 </div>
-                {% else %}
-                <div class="text-center p-4 text-muted">
-                    <i class="fas fa-calendar-check fa-3x mb-3"></i>
-                    <p class="mb-0">No hay citas programadas para hoy</p>
-                </div>
-                {% endif %}
-            </div>
-            <div class="card-footer text-end">
-                <a href="#" class="btn btn-sm btn-outline-primary">Ver todas las citas</a>
-                <a href="#" class="btn btn-sm btn-primary">
-                    <i class="fas fa-plus me-1"></i> Nueva Cita
-                </a>
             </div>
         </div>
     </div>
     
-    <!-- Reparaciones en Progreso -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2 kpi-card success">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Reparaciones Activas</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ reparaciones_en_progreso|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tools fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2 kpi-card warning">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Tareas Pendientes</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ tareas_por_hacer|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-danger shadow h-100 py-2 kpi-card danger">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Repuestos por Pedir</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">3</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenido principal -->
+<div class="row">
+    <!-- Citas de Hoy -->
     <div class="col-md-6 mb-4">
-        <div class="card h-100">
+        <div class="card h-100 card-dashboard">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="card-title mb-0">Reparaciones en Curso</h6>
-                <span class="badge bg-warning text-dark rounded-pill">{{ reparaciones_en_progreso|length }}</span>
+                <h6 class="card-title mb-0 d-flex align-items-center">
+                    <i class="fas fa-calendar-day me-2 text-primary"></i>Citas para Hoy
+                </h6>
+                <a href="{% url 'agregar_cita' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-plus me-1"></i> Nueva Cita
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if citas_hoy %}
+                <div class="list-group list-group-flush">
+                    {% for cita in citas_hoy|slice:":5" %}
+                    <a href="{% url 'detalle_cita' cita.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}</h6>
+                            <small>{{ cita.hora_inicio|time:"H:i" }}</small>
+                        </div>
+                        <p class="mb-1">{{ cita.descripcion|truncatechars:60 }}</p>
+                        <small class="text-muted">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-calendar-day fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-muted mb-0">No hay citas programadas para hoy</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-transparent border-0 py-2">
+                <a href="{% url 'lista_citas' %}" class="btn btn-sm btn-link text-primary p-0">Ver todas las citas</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reparaciones en Curso -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 card-dashboard">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0 d-flex align-items-center">
+                    <i class="fas fa-tools me-2 text-primary"></i>Reparaciones en Curso
+                </h6>
+                <a href="{% url 'crear_reparacion' %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus me-1"></i> Nueva
+                </a>
             </div>
             <div class="card-body p-0">
                 {% if reparaciones_en_progreso %}
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Vehículo</th>
-                                <th>Cliente</th>
-                                <th>Estado</th>
-                                <th>Días</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for reparacion in reparaciones_en_progreso %}
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="me-2">
-                                            <i class="fas fa-car text-primary"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold">{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</div>
-                                            <small class="text-muted">{{ reparacion.vehiculo.placa }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    {{ reparacion.vehiculo.cliente.nombre }}
-                                    {{ reparacion.vehiculo.cliente.apellido|slice:":1" }}.
-                                </td>
-                                <td>
-                                    <span class="badge bg-{{ reparacion.estado|lower }}">
-                                        {{ reparacion.estado }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {{ reparacion.fecha_ingreso|timesince }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="list-group list-group-flush">
+                    {% for reparacion in reparaciones_en_progreso|slice:":5" %}
+                    <a href="{% url 'detalle_reparacion' reparacion.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</h6>
+                            <span class="badge bg-warning text-dark">En Progreso</span>
+                        </div>
+                        <p class="mb-1">{{ reparacion.descripcion|truncatechars:60 }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">Iniciada: {{ reparacion.fecha_inicio|date:"d/m/Y" }}</small>
+                            <small class="text-primary">Ver detalles</small>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
                 {% else %}
-                <div class="text-center p-4 text-muted">
-                    <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
-                    <p class="mb-0">No hay reparaciones en curso en este momento</p>
+                <div class="text-center p-4">
+                    <i class="fas fa-tools fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-muted mb-0">No hay reparaciones en curso</p>
                 </div>
                 {% endif %}
             </div>
-            <div class="card-footer text-end">
-                <a href="#" class="btn btn-sm btn-outline-secondary">Ver todas las reparaciones</a>
-                <a href="#" class="btn btn-sm btn-primary">
-                    <i class="fas fa-plus me-1"></i> Nueva Reparación
-                </a>
+            <div class="card-footer bg-transparent border-0 py-2">
+                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-sm btn-link text-primary p-0">Ver todas las reparaciones</a>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <!-- Próximas Citas -->
-    <div class="col-md-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Próximas Citas</h6>
-            </div>
-            <div class="card-body">
-                {% if proximas_citas %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                                <th>Cliente</th>
-                                <th>Vehículo</th>
-                                <th>Servicio</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for cita in proximas_citas %}
-                            <tr>
-                                <td>{{ cita.fecha|date:"d/m/Y" }}</td>
-                                <td>{{ cita.hora|time:"H:i" }}</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-sm me-2">
-                                            <div class="avatar-title bg-light text-primary rounded-circle">
-                                                {{ cita.cliente.nombre|first|upper }}{{ cita.cliente.apellido|first|upper }}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            {{ cita.cliente.nombre }} {{ cita.cliente.apellido }}
-                                            <div class="text-muted small">{{ cita.cliente.telefono }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="fw-bold">{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}</div>
-                                    <div class="text-muted small">{{ cita.vehiculo.placa }}</div>
-                                </td>
-                                <td>{{ cita.servicio.nombre_servicio }}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Ver detalles">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-success" data-bs-toggle="tooltip" title="Confirmar">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" data-bs-toggle="tooltip" title="Cancelar">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center p-4 text-muted">
-                    <i class="fas fa-calendar-alt fa-3x mb-3"></i>
-                    <p class="mb-0">No hay próximas citas programadas</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Tablero de Tareas -->
+{% include 'gestion/partials/task_board.html' %}
 
-<!-- Tareas Pendientes -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Tareas Pendientes</h6>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Tareas Pendientes -->
-                    <div class="col-md-4">
-                        <div class="border rounded p-3 h-100">
-                            <h6 class="text-uppercase text-muted small mb-3">Por Hacer</h6>
-                            <div id="todo-tasks">
-                                <!-- Tarea de ejemplo -->
-                                <div class="card mb-2 border">
-                                    <div class="card-body p-2">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="form-check mb-0">
-                                                <input class="form-check-input" type="checkbox" id="task1">
-                                                <label class="form-check-label" for="task1">
-                                                    Revisar inventario de repuestos
-                                                </label>
-                                            </div>
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item" href="#">Editar</a></li>
-                                                    <li><a class="dropdown-item text-danger" href="#">Eliminar</a></li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mt-2">
-                                            <span class="badge bg-light text-dark"><i class="far fa-clock me-1"></i> Hoy</span>
-                                            <span class="badge bg-info">Inventario</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Fin tarea de ejemplo -->
-                            </div>
-                            <button class="btn btn-outline-primary btn-sm w-100 mt-2">
-                                <i class="fas fa-plus me-1"></i> Agregar Tarea
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- En Progreso -->
-                    <div class="col-md-4">
-                        <div class="border rounded p-3 h-100">
-                            <h6 class="text-uppercase text-muted small mb-3">En Progreso</h6>
-                            <div id="in-progress-tasks">
-                                <!-- Tarea de ejemplo -->
-                                <div class="card mb-2 border">
-                                    <div class="card-body p-2">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="form-check mb-0">
-                                                <input class="form-check-input" type="checkbox" id="task2" checked>
-                                                <label class="form-check-label" for="task2">
-                                                    Llamar a proveedor de repuestos
-                                                </label>
-                                            </div>
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item" href="#">Editar</a></li>
-                                                    <li><a class="dropdown-item text-danger" href="#">Eliminar</a></li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mt-2">
-                                            <span class="badge bg-light text-dark"><i class="far fa-clock me-1"></i> Hoy</span>
-                                            <span class="badge bg-warning text-dark">Proveedores</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Fin tarea de ejemplo -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Completadas -->
-                    <div class="col-md-4">
-                        <div class="border rounded p-3 h-100">
-                            <h6 class="text-uppercase text-muted small mb-3">Completadas</h6>
-                            <div id="completed-tasks">
-                                <!-- Tarea de ejemplo -->
-                                <div class="card mb-2 border">
-                                    <div class="card-body p-2 bg-light">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="form-check mb-0">
-                                                <input class="form-check-input" type="checkbox" id="task3" checked disabled>
-                                                <label class="form-check-label text-muted" for="task3">
-                                                    <s>Revisar correos electrónicos</s>
-                                                </label>
-                                            </div>
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item" href="#">Mover a Pendiente</a></li>
-                                                    <li><a class="dropdown-item text-danger" href="#">Eliminar</a></li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mt-2">
-                                            <span class="badge bg-light text-muted"><i class="far fa-check-circle me-1"></i> Completada</span>
-                                            <span class="badge bg-secondary">Administrativo</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Fin tarea de ejemplo -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Función para cambiar el estado de una tarea mediante AJAX
+function cambiarEstadoTarea(tareaId, nuevoEstado) {
+    fetch(`/tareas/cambiar-estado/${tareaId}/${nuevoEstado}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFTTOKEN': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recargar la página para ver los cambios
+            window.location.reload();
+        } else {
+            alert('Error al actualizar el estado de la tarea: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al conectar con el servidor');
+    });
+}
+
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
 {% endblock %}

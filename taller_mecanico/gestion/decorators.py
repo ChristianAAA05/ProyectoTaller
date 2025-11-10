@@ -42,14 +42,20 @@ def es_encargado(user):
 
     Un usuario es considerado encargado si:
     - Tiene perfil de empleado
-    - Su puesto es 'encargado' o 'supervisor'
+    - Su puesto es 'encargado', 'supervisor' o 'jefe'
 
     Returns:
         bool: True si es encargado, False en caso contrario
     """
     try:
-        return (user.profile.es_empleado and
-                user.profile.empleado_relacionado.puesto.lower() in ['encargado', 'supervisor'])
+        # Si es jefe, también tiene permisos de encargado
+        if es_jefe(user):
+            return True
+            
+        # Verificar si es empleado y su puesto es encargado o supervisor
+        if hasattr(user, 'profile') and user.profile.es_empleado and user.profile.empleado_relacionado:
+            return user.profile.empleado_relacionado.puesto.lower() in ['encargado', 'supervisor']
+        return False
     except:
         return False
 

@@ -20,7 +20,8 @@ Cada formulario incluye:
 from django import forms
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda
+from django.contrib.auth.models import User
+from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Tarea
 
 class ClienteForm(forms.ModelForm):
     """
@@ -301,6 +302,82 @@ class ReparacionForm(forms.ModelForm):
             'notas': 'Puede agregar notas adicionales sobre la reparación.'
         }
 
+
+class TareaForm(forms.ModelForm):
+    """Formulario para crear y editar tareas en el sistema.
+    
+    Permite gestionar las tareas del personal, incluyendo título, descripción,
+    estado, prioridad y fecha límite.
+    """
+    class Meta:
+        model = Tarea
+        fields = ['titulo', 'descripcion', 'estado', 'prioridad', 'fecha_limite', 'asignada_a', 'etiqueta']
+        
+        labels = {
+            'titulo': 'Título de la tarea',
+            'descripcion': 'Descripción',
+            'estado': 'Estado',
+            'prioridad': 'Prioridad',
+            'fecha_limite': 'Fecha límite',
+            'asignada_a': 'Asignar a',
+            'etiqueta': 'Etiqueta (opcional)'
+        }
+        
+        widgets = {
+            'titulo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese el título de la tarea',
+                'required': True
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describa los detalles de la tarea...',
+                'required': True
+            }),
+            'estado': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True
+            }),
+            'prioridad': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True
+            }),
+            'fecha_limite': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'required': False
+            }),
+            'asignada_a': forms.Select(attrs={
+                'class': 'form-select',
+                'required': False
+            }),
+            'etiqueta': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Inventario, Cliente, Mantenimiento',
+                'required': False
+            })
+        }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar usuarios a los que se puede asignar la tarea (solo empleados)
+        self.fields['asignada_a'].queryset = User.objects.filter(
+            profile__es_empleado=True
+        )
+        
+        # Si es una nueva tarea, establecer el creador
+        if user and not self.instance.pk:
+            self.instance.creada_por = user
+            
+        # Si es una tarea existente, asegurarse de que el usuario puede editarla
+        if self.instance.pk and user:
+            if user != self.instance.creada_por and user != self.instance.asignada_a:
+                # Si el usuario no es ni el creador ni el asignado, solo puede ver
+                for field in self.fields:
+                    self.fields[field].widget.attrs['disabled'] = True
 
 class CitaForm(forms.ModelForm):
     """Formulario para crear y editar citas en el taller.

@@ -1,0 +1,189 @@
+{% extends 'gestion/tareas/base_tareas.html' %}
+
+{% block titulo_pagina %}Nueva Tarea{% endblock %}
+
+{% block acciones_adicionales %}
+<a href="{% url 'lista_tareas' %}" class="btn btn-secondary btn-sm">
+    <i class="fas fa-arrow-left fa-sm"></i> Volver al listado
+</a>
+{% endblock %}
+
+{% block contenido_tareas %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Crear Nueva Tarea</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label for="{{ form.titulo.id_for_label }}" class="font-weight-bold">
+                            {{ form.titulo.label }}
+                        </label>
+                        {{ form.titulo }}
+                        {% if form.titulo.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.titulo.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Un título claro y descriptivo para la tarea.
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.descripcion.id_for_label }}" class="font-weight-bold">
+                            {{ form.descripcion.label }}
+                        </label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.descripcion.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Describe con detalle en qué consiste la tarea.
+                        </small>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="{{ form.estado.id_for_label }}" class="font-weight-bold">
+                                {{ form.estado.label }}
+                            </label>
+                            {{ form.estado }}
+                            {% if form.estado.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.estado.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group col-md-6">
+                            <label for="{{ form.prioridad.id_for_label }}" class="font-weight-bold">
+                                {{ form.prioridad.label }}
+                            </label>
+                            {{ form.prioridad }}
+                            {% if form.prioridad.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.prioridad.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="{{ form.fecha_limite.id_for_label }}" class="font-weight-bold">
+                                {{ form.fecha_limite.label }} (opcional)
+                            </label>
+                            {{ form.fecha_limite }}
+                            {% if form.fecha_limite.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.fecha_limite.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Fecha límite para completar la tarea.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group col-md-6">
+                            <label for="{{ form.asignada_a.id_for_label }}" class="font-weight-bold">
+                                {{ form.asignada_a.label }} (opcional)
+                            </label>
+                            {{ form.asignada_a }}
+                            {% if form.asignada_a.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.asignada_a.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Selecciona a qué empleado se le asignará esta tarea.
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.etiqueta.id_for_label }}" class="font-weight-bold">
+                            {{ form.etiqueta.label }} (opcional)
+                        </label>
+                        {{ form.etiqueta }}
+                        {% if form.etiqueta.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.etiqueta.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Etiqueta para categorizar la tarea (ej: Inventario, Cliente, Mantenimiento).
+                        </small>
+                    </div>
+                    
+                    <div class="form-group mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> Guardar Tarea
+                        </button>
+                        <a href="{% url 'lista_tareas' %}" class="btn btn-secondary">
+                            <i class="fas fa-times mr-1"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Inicializar datepicker para el campo de fecha límite
+$(document).ready(function() {
+    // Activar validación de formularios de Bootstrap
+    (function() {
+        'use strict';
+        window.addEventListener('load', function() {
+            var forms = document.getElementsByClassName('needs-validation');
+            var validation = Array.prototype.filter.call(forms, function(form) {
+                form.addEventListener('submit', function(event) {
+                    if (form.checkValidity() === false) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        }, false);
+    })();
+    
+    // Inicializar datepicker con opciones
+    $('#id_fecha_limite').datepicker({
+        format: 'yyyy-mm-dd',
+        autoclose: true,
+        todayHighlight: true,
+        startDate: '0d',
+        language: 'es',
+        orientation: 'bottom auto'
+    });
+    
+    // Inicializar select2 para el campo de asignación
+    $('#id_asignada_a').select2({
+        placeholder: 'Selecciona un empleado',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#id_asignada_a').parent()
+    });
+});
+</script>
+{% endblock %}
