@@ -1,39 +1,94 @@
 from django.forms import formset_factory
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
-from django.urls import reverse
-from django.views.generic import ListView
-from django.views.decorators.http import require_http_methods
-from django.core.exceptions import ValidationError
-from django.db.models import Count, Q, Sum
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
-from django.forms import modelformset_factory, formset_factory, inlineformset_factory
+from django.contrib.auth.decorators import login_required, permission_required
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, View
+from django.urls import reverse_lazy, reverse
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.db import transaction
+from django.db.models import Q, Sum, F, Count, Case, When, Value, IntegerField
 from django.utils import timezone
-from datetime import datetime, time as dt_time, timedelta
-from django.db.models.functions import TruncMonth
-from io import BytesIO
-from django.views.decorators.http import require_POST
-import csv
-
-from .models import Cliente, Empleado, Servicio, Vehiculo, Reparacion, Agenda, Registro, Tarea
-from .forms import ClienteForm, VehiculoForm, EmpleadoForm, ServicioForm, ReparacionForm, CitaForm, TareaForm
-from .decorators import es_jefe, es_encargado, puede_gestionar_empleados, puede_gestionar_servicios
-
-# Importaciones para la API REST
-from rest_framework import generics, viewsets, status
+from datetime import timedelta, datetime
+from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.http import JsonResponse, HttpResponse, HttpResponseRedirect, Http404
+from django.template.loader import render_to_string
+from django.views.decorators.http import require_http_methods, require_POST
+from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
-from .serializers import *
+from django.contrib.auth import get_user_model
+from .models import (
+    Cliente, Vehiculo, Servicio, Empleado, Reparacion, Tarea, 
+    TareaHistorial  # Solo importar modelos definidos
+)
+from .forms import (
+    ClienteForm, VehiculoForm, ServicioForm, EmpleadoForm, 
+    ReparacionForm, TareaForm, CitaForm
+)
+from .serializers import (
+    ClienteSerializer, VehiculoSerializer, ServicioSerializer, 
+    EmpleadoSerializer, ReparacionSerializer, AgendaSerializer, RegistroSerializer
+)
+
+User = get_user_model()
 
 # Funciones de ayuda para permisos
+def es_jefe(user):
+    """Verifica si el usuario es jefe"""
+    if not user.is_authenticated:
+        return False
+    return hasattr(user, 'profile') and hasattr(user.profile, 'es_jefe') and user.profile.es_jefe
+
+def es_encargado(user):
+    """Verifica si el usuario es encargado"""
+    if not user.is_authenticated:
+        return False
+    return hasattr(user, 'profile') and hasattr(user.profile, 'es_encargado') and user.profile.es_encargado
+
+def puede_gestionar_empleados(user):
+    """Verifica si el usuario puede gestionar empleados"""
+    if not user.is_authenticated:
+        return False
+    return es_jefe(user) or es_encargado(user)
+
+def puede_gestionar_servicios(user):
+    """Verifica si el usuario puede gestionar servicios"""
+    if not user.is_authenticated:
+        return False
+    return es_jefe(user) or es_encargado(user)
+
 def es_jefe_o_encargado(user):
     """Verifica si el usuario es jefe o encargado"""
-    return user.is_authenticated and (user.is_staff or hasattr(user, 'profile') and user.profile.es_empleado)
+    if not user.is_authenticated:
+        return False
+        
+    # Si es superusuario, tiene acceso total
+    if user.is_superuser:
+        return True
+        
+    # Verificar si el perfil existe y tiene un empleado relacionado
+    if hasattr(user, 'profile') and hasattr(user.profile, 'empleado_relacionado'):
+        empleado = user.profile.empleado_relacionado
+        if empleado and hasattr(empleado, 'puesto'):
+            return empleado.puesto.lower() in ['jefe', 'encargado', 'supervisor', 'administrador']
+            
+    return False
+
+
+def es_mecanico(user):
+    """Verifica si el usuario es un mecánico"""
+    if not user.is_authenticated:
+        return False
+        
+    # Verificar si el perfil existe, es empleado y tiene un empleado relacionado
+    if hasattr(user, 'profile') and user.profile.es_empleado and hasattr(user.profile, 'empleado_relacionado'):
+        empleado = user.profile.empleado_relacionado
+        if empleado and hasattr(empleado, 'puesto'):
+            return empleado.puesto.lower() in ['mecanico', 'técnico', 'taller']
+            
+    return False
 
 # ========== AUTENTICACIÓN Y DASHBOARD BÁSICOS ==========
 
@@ -202,25 +257,26 @@ def cambiar_estado_tarea(request, tarea_id, nuevo_estado):
 @login_required
 def inicio(request):
     # Redirigir según el rol del usuario
-    if es_jefe(request.user):
-        return redirect('dashboard_jefe')
-    elif es_encargado(request.user):
+    if es_jefe_o_encargado(request.user):
         return redirect('dashboard_encargado')
+    elif es_mecanico(request.user):
+        return redirect('dashboard_mecanico')
         
-    # Si no es ni jefe ni encargado, mostrar dashboard básico
+    # Si no es ni jefe, ni encargado, ni mecánico, mostrar dashboard básico
     total_clientes = Cliente.objects.count()
     total_empleados = Empleado.objects.count()
     total_servicios = Servicio.objects.count()
     total_vehiculos = Vehiculo.objects.count()
     reparaciones_pendientes = Reparacion.objects.filter(estado_reparacion='en_progreso').count()
-    citas_hoy = Agenda.objects.filter(fecha=timezone.now().date()).count()
+    # citas_hoy = 0  # Comentado temporalmente hasta que se implemente el modelo Agenda
+    
     context = {
         'total_clientes': total_clientes,
         'total_empleados': total_empleados,
         'total_servicios': total_servicios,
         'total_vehiculos': total_vehiculos,
         'reparaciones_pendientes': reparaciones_pendientes,
-        'citas_hoy': citas_hoy,
+        # 'citas_hoy': citas_hoy,  # Comentado temporalmente
     }
     return render(request, 'inicio.html', context)
 
@@ -237,20 +293,22 @@ def dashboard_encargado(request):
     Vista del dashboard para el rol de encargado.
     Muestra información relevante para el seguimiento de tareas diarias.
     """
-    # Obtener citas de hoy
+    # Verificar permisos
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+        
+    # Obtener la fecha de hoy
     hoy = timezone.now().date()
-    citas_hoy = Agenda.objects.filter(fecha=hoy).select_related('cliente', 'servicio')
     
     # Obtener reparaciones en progreso
     reparaciones_en_progreso = Reparacion.objects.filter(
         estado_reparacion='en_progreso'
-    ).select_related('vehiculo__cliente')
+    ).select_related('vehiculo', 'vehiculo__cliente', 'servicio').order_by('-fecha_ingreso')[:5]
     
-    # Obtener próximas citas (próximos 7 días)
-    fecha_fin = hoy + timezone.timedelta(days=7)
-    proximas_citas = Agenda.objects.filter(
-        fecha__range=[hoy, fecha_fin]
-    ).exclude(fecha=hoy).select_related('cliente', 'servicio').order_by('fecha', 'hora')
+    # Inicializar variables para citas (comentadas temporalmente)
+    citas_hoy = []
+    proximas_citas = []
     
     # Obtener tareas para el dashboard
     tareas = Tarea.objects.all()
@@ -268,6 +326,71 @@ def dashboard_encargado(request):
     }
     
     return render(request, 'gestion/dashboard_encargado.html', context)
+
+
+@login_required
+def dashboard_mecanico(request):
+    """
+    Vista del dashboard para el rol de mecánico.
+    Muestra información relevante para el trabajo diario del mecánico.
+    """
+    # Verificar permisos
+    if not es_mecanico(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    # Obtener fecha actual
+    hoy = timezone.now().date()
+    
+    # Obtener tareas asignadas al mecánico
+    tareas_asignadas = Tarea.objects.filter(
+        asignada_a=request.user,
+        estado__in=['por_hacer', 'en_progreso']
+    ).order_by('fecha_limite')
+    
+    # Obtener el perfil de empleado del usuario actual
+    empleado = None
+    if hasattr(request.user, 'profile') and hasattr(request.user.profile, 'empleado_relacionado'):
+        empleado = request.user.profile.empleado_relacionado
+    
+    # Inicializar querysets vacíos
+    reparaciones_asignadas = Reparacion.objects.none()
+    reparaciones_disponibles = Reparacion.objects.none()
+    
+    if empleado:
+        # Reparaciones ya asignadas al mecánico
+        reparaciones_asignadas = Reparacion.objects.filter(
+            mecanico_asignado=empleado,
+            estado_reparacion__in=['en_progreso', 'pendiente']
+        ).select_related('vehiculo__cliente').order_by('fecha_ingreso')
+        
+        # Reparaciones disponibles para que el mecánico las tome
+        reparaciones_disponibles = Reparacion.objects.filter(
+            estado_reparacion='pendiente',
+            mecanico_asignado__isnull=True  # Solo reparaciones sin asignar
+        ).select_related('vehiculo__cliente').order_by('fecha_ingreso')
+    
+    # Obtener próximas citas asignadas (hoy y mañana)
+    manana = hoy + timezone.timedelta(days=1)
+    citas_proximas = []
+    
+    # Obtener tareas recientemente completadas (últimas 5)
+    tareas_completadas = Tarea.objects.filter(
+        asignada_a=request.user,
+        estado='completada'
+    ).order_by('-fecha_creacion')[:5]
+    
+    context = {
+        'tareas_asignadas': tareas_asignadas,
+        'reparaciones_asignadas': reparaciones_asignadas,
+        'reparaciones_disponibles': reparaciones_disponibles,
+        'citas_proximas': citas_proximas,
+        'tareas_completadas': tareas_completadas,
+        'hoy': hoy,
+        'empleado': empleado,
+    }
+    
+    return render(request, 'gestion/dashboard_mecanico.html', context)
 
 
 @login_required
@@ -1104,184 +1227,318 @@ class VehiculoRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 class ReparacionListCreate(generics.ListCreateAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Si el usuario es mecánico, solo mostrar sus reparaciones asignadas
+        if hasattr(self.request.user, 'profile') and hasattr(self.request.user.profile, 'es_mecanico') and self.request.user.profile.es_mecanico:
+            return Reparacion.objects.filter(
+                Q(mecanico_asignado__usuario=self.request.user) | 
+                Q(mecanico_asignado__isnull=True, estado_reparacion='pendiente')
+            ).distinct()
+        return super().get_queryset()
 
 
 class ReparacionRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Reparacion.objects.all()
     serializer_class = ReparacionSerializer
+    permission_classes = [IsAuthenticated]
 
 
-# Agenda (citas)
-class AgendaViewSet(viewsets.ModelViewSet):
-    queryset = Agenda.objects.all()
-    serializer_class = AgendaSerializer
+@login_required
+def tomar_reparacion(request, reparacion_id):
+    """
+    Vista para que un mecánico pueda tomar una reparación.
+    """
+    # Verificar que el usuario sea un mecánico
+    if not hasattr(request.user, 'profile') or not hasattr(request.user.profile, 'es_mecanico') or not request.user.profile.es_mecanico:
+        messages.error(request, 'No tienes permiso para realizar esta acción.')
+        return redirect('dashboard')
+    
+    # Obtener la reparación
+    reparacion = get_object_or_404(Reparacion, id=reparacion_id)
+    
+    # Verificar si la reparación ya está asignada a otro mecánico
+    if reparacion.mecanico_asignado and reparacion.mecanico_asignado.usuario != request.user:
+        messages.warning(request, 'Esta reparación ya ha sido tomada por otro mecánico.')
+        return redirect('dashboard_reparaciones')
+    
+    # Obtener o crear el perfil de empleado del usuario
+    try:
+        empleado = request.user.empleado
+    except Empleado.DoesNotExist:
+        # Si no existe el empleado, crearlo
+        empleado = Empleado.objects.create(
+            usuario=request.user,
+            nombre=request.user.get_full_name() or request.user.username,
+            cargo='Mecánico',
+            telefono='',
+            direccion='',
+            fecha_contratacion=timezone.now().date(),
+            salario=0
+        )
+    
+    # Asignar la reparación al mecánico
+    reparacion.mecanico_asignado = empleado
+    reparacion.estado_reparacion = 'en_progreso'
+    reparacion.save()
+    
+    messages.success(request, f'Has tomado la reparación de {reparacion.vehiculo}.')
+    return redirect('detalle_reparacion', pk=reparacion.id)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        try:
-            cita = Agenda().programarCita(
-                cliente=serializer.validated_data['cliente'],
-                servicio=serializer.validated_data['servicio'],
-                fecha=serializer.validated_data['fecha'],
-                hora=serializer.validated_data['hora']
+
+@login_required
+def listar_reparaciones_disponibles(request):
+    """
+    Vista para listar las reparaciones disponibles para que un mecánico las tome.
+    """
+    # Verificar que el usuario sea un mecánico
+    if not hasattr(request.user, 'profile') or not hasattr(request.user.profile, 'es_mecanico') or not request.user.profile.es_mecanico:
+        messages.error(request, 'No tienes permiso para ver esta página.')
+        return redirect('dashboard')
+    
+    # Obtener las reparaciones disponibles (sin asignar o asignadas al usuario actual)
+    reparaciones = Reparacion.objects.filter(
+        Q(mecanico_asignado__isnull=True, estado_reparacion='pendiente') |
+        Q(mecanico_asignado__usuario=request.user)
+    ).order_by('fecha_ingreso')
+    
+    # Obtener las reparaciones asignadas al usuario actual
+    mis_reparaciones = Reparacion.objects.filter(
+        mecanico_asignado__usuario=request.user,
+        estado_reparacion='en_progreso'
+    ).order_by('fecha_ingreso')
+    
+    return render(request, 'gestion/reparaciones_disponibles.html', {
+        'reparaciones': reparaciones,
+        'mis_reparaciones': mis_reparaciones,
+        'titulo': 'Reparaciones Disponibles'
+    })
+
+
+@login_required
+def detalle_reparacion(request, pk):
+    """
+    Vista para mostrar los detalles de una reparación específica.
+    """
+    # Obtener la reparación o devolver 404 si no existe
+    reparacion = get_object_or_404(Reparacion, pk=pk)
+    
+    # Verificar permisos: el usuario debe ser el mecánico asignado o tener permisos de superusuario
+    if (not request.user.is_superuser and 
+        (not hasattr(request.user, 'empleado') or 
+         reparacion.mecanico_asignado != request.user.empleado)):
+        messages.error(request, 'No tienes permiso para ver esta reparación.')
+        return redirect('dashboard')
+    
+    # Obtener tareas relacionadas con esta reparación
+    tareas = Tarea.objects.filter(reparacion=reparacion).order_by('fecha_creacion')
+    
+    # Obtener historial de cambios
+    historial = TareaHistorial.objects.filter(
+        tarea__reparacion=reparacion
+    ).select_related('usuario', 'tarea').order_by('-fecha_cambio')
+    
+    # Formulario para agregar una nueva tarea
+    if request.method == 'POST':
+        tarea_form = TareaForm(request.POST, user=request.user)
+        if tarea_form.is_valid():
+            nueva_tarea = tarea_form.save(commit=False)
+            nueva_tarea.reparacion = reparacion
+            nueva_tarea.creada_por = request.user
+            nueva_tarea.save()
+            
+            # Registrar en el historial
+            TareaHistorial.objects.create(
+                tarea=nueva_tarea,
+                usuario=request.user,
+                accion='creada',
+                descripcion=f'Tarea {nueva_tarea.titulo} creada.'
             )
-        except ValidationError as e:
-            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
-        output_serializer = self.get_serializer(cita)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+            
+            messages.success(request, 'Tarea agregada correctamente.')
+            return redirect('detalle_reparacion', pk=reparacion.pk)
+    else:
+        tarea_form = TareaForm(user=request.user)
+    
+    return render(request, 'gestion/detalle_reparacion.html', {
+        'reparacion': reparacion,
+        'tareas': tareas,
+        'historial': historial[:10],  # Mostrar solo los 10 registros más recientes
+        'tarea_form': tarea_form,
+        'titulo': f'Reparación #{reparacion.id} - {reparacion.vehiculo}'
+    })
 
 
-# Registro (historial)
-class RegistroViewSet(viewsets.ModelViewSet):
-    queryset = Registro.objects.all()
-    serializer_class = RegistroSerializer
+# Agenda (citas) - Comentado temporalmente
+# class AgendaViewSet(viewsets.ModelViewSet):
+#     queryset = Agenda.objects.all()
+#     serializer_class = AgendaSerializer
+# 
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         try:
+#             cita = Agenda().programarCita(
+#                 cliente=serializer.validated_data['cliente'],
+#                 servicio=serializer.validated_data['servicio'],
+#                 fecha=serializer.validated_data['fecha'],
+#                 hora=serializer.validated_data['hora']
+#             )
+#         except ValidationError as e:
+#             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+#         output_serializer = self.get_serializer(cita)
+#         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        try:
-            registro = Registro().crearRegistro(
-                cliente=serializer.validated_data['cliente'],
-                empleado=serializer.validated_data['empleado'],
-                servicio=serializer.validated_data['servicio'],
-                fecha=serializer.validated_data.get('fecha', None)
-            )
-        except ValidationError as e:
-            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
-        output_serializer = self.get_serializer(registro)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+# Registro (historial) - Comentado temporalmente
+# class RegistroViewSet(viewsets.ModelViewSet):
+#     queryset = Registro.objects.all()
+#     serializer_class = RegistroSerializer
+# 
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         try:
+#             registro = Registro().crearRegistro(
+#                 cliente=serializer.validated_data['cliente'],
+#                 empleado=serializer.validated_data['empleado'],
+#                 servicio=serializer.validated_data['servicio'],
+#                 fecha=serializer.validated_data.get('fecha', None)
+#             )
+#         except ValidationError as e:
+#             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+#         output_serializer = self.get_serializer(registro)
+#         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
 # ========== VISTAS DE CITAS ==========
 
-@login_required
-def lista_citas(request):
-    """Vista para listar todas las citas"""
-    citas = Agenda.objects.select_related('cliente', 'servicio').order_by('-fecha', '-hora')
-    return render(request, 'gestion/citas/lista_citas.html', {
-        'titulo': 'Lista de Citas',
-        'citas': citas
-    })
+# @login_required
+# def lista_citas(request):
+#     """Vista para listar todas las citas"""
+#     citas = Agenda.objects.select_related('cliente', 'servicio').order_by('-fecha', '-hora')
+#     return render(request, 'gestion/citas/lista_citas.html', {
+#         'titulo': 'Lista de Citas',
+#         'citas': citas
+#     })
 
-@login_required
-def crear_cita(request):
-    """Vista para crear una nueva cita"""
-    if request.method == 'POST':
-        form = CitaForm(request.POST)
-        if form.is_valid():
-            try:
-                cita = form.save(commit=False)
-                # Validar que la fecha no sea pasada
-                if cita.fecha < timezone.now().date():
-                    messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
-                # Validar que no haya otra cita a la misma hora
-                elif Agenda.objects.filter(fecha=cita.fecha, hora=cita.hora).exists():
-                    messages.error(request, 'Ya existe una cita programada para esa fecha y hora.')
-                else:
-                    cita.save()
-                    messages.success(request, 'Cita creada exitosamente.')
-                    return redirect('lista_citas')
-            except Exception as e:
-                messages.error(request, f'Error al crear la cita: {str(e)}')
-    else:
-        form = CitaForm()
+# @login_required
+# def crear_cita(request):
+#     """Vista para crear una nueva cita"""
+#     if request.method == 'POST':
+#         form = CitaForm(request.POST)
+#         if form.is_valid():
+#             try:
+#                 cita = form.save(commit=False)
+#                 # Validar que la fecha no sea pasada
+#                 if cita.fecha < timezone.now().date():
+#                     messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
+#                 # Validar que no haya otra cita a la misma hora
+#                 elif Agenda.objects.filter(fecha=cita.fecha, hora=cita.hora).exists():
+#                     messages.error(request, 'Ya existe una cita programada para esa fecha y hora.')
+#                 else:
+#                     cita.save()
+#                     messages.success(request, 'Cita creada exitosamente.')
+#                     return redirect('lista_citas')
+#             except Exception as e:
+#                 messages.error(request, f'Error al crear la cita: {str(e)}')
+#     else:
+#         form = CitaForm()
     
-    return render(request, 'gestion/citas/crear_cita.html', {
-        'titulo': 'Nueva Cita',
-        'form': form
-    })
+#     return render(request, 'gestion/citas/crear_cita.html', {
+#         'titulo': 'Nueva Cita',
+#         'form': form
+#     })
 
-@login_required
-def editar_cita(request, pk):
-    """Vista para editar una cita existente"""
-    cita = get_object_or_404(Agenda, pk=pk)
+# @login_required
+# def editar_cita(request, pk):
+#     """Vista para editar una cita existente"""
+#     cita = get_object_or_404(Agenda, pk=pk)
     
-    if request.method == 'POST':
-        form = CitaForm(request.POST, instance=cita)
-        if form.is_valid():
-            try:
-                cita_editada = form.save(commit=False)
-                # Validar que la fecha no sea pasada
-                if cita_editada.fecha < timezone.now().date():
-                    messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
-                # Validar que no haya otra cita a la misma hora (excluyendo la actual)
-                elif Agenda.objects.filter(fecha=cita_editada.fecha, hora=cita_editada.hora).exclude(pk=pk).exists():
-                    messages.error(request, 'Ya existe otra cita programada para esa fecha y hora.')
-                else:
-                    cita_editada.save()
-                    messages.success(request, 'Cita actualizada exitosamente.')
-                    return redirect('lista_citas')
-            except Exception as e:
-                messages.error(request, f'Error al actualizar la cita: {str(e)}')
-    else:
-        form = CitaForm(instance=cita)
+#     if request.method == 'POST':
+#         form = CitaForm(request.POST, instance=cita)
+#         if form.is_valid():
+#             try:
+#                 cita_editada = form.save(commit=False)
+#                 # Validar que la fecha no sea pasada
+#                 if cita_editada.fecha < timezone.now().date():
+#                     messages.error(request, 'No se pueden agendar citas en fechas pasadas.')
+#                 # Validar que no haya otra cita a la misma hora (excluyendo la actual)
+#                 elif Agenda.objects.filter(fecha=cita_editada.fecha, hora=cita_editada.hora).exclude(pk=pk).exists():
+#                     messages.error(request, 'Ya existe otra cita programada para esa fecha y hora.')
+#                 else:
+#                     cita_editada.save()
+#                     messages.success(request, 'Cita actualizada exitosamente.')
+#                     return redirect('lista_citas')
+#             except Exception as e:
+#                 messages.error(request, f'Error al actualizar la cita: {str(e)}')
+#     else:
+#         form = CitaForm(instance=cita)
     
-    return render(request, 'gestion/citas/editar_cita.html', {
-        'titulo': 'Editar Cita',
-        'form': form,
-        'cita': cita
-    })
+#     return render(request, 'gestion/citas/editar_cita.html', {
+#         'titulo': 'Editar Cita',
+#         'form': form,
+#         'cita': cita
+#     })
 
-@login_required
-def detalle_cita(request, pk):
-    """Vista para mostrar los detalles de una cita"""
-    cita = get_object_or_404(Agenda, pk=pk)
-    return render(request, 'gestion/citas/detalle_cita.html', {
-        'titulo': 'Detalle de Cita',
-        'cita': cita
-    })
+# @login_required
+# def detalle_cita(request, pk):
+#     """Vista para mostrar los detalles de una cita"""
+#     cita = get_object_or_404(Agenda, pk=pk)
+#     return render(request, 'gestion/citas/detalle_cita.html', {
+#         'titulo': 'Detalle de Cita',
+#         'cita': cita
+#     })
 
-@login_required
-def eliminar_cita(request, pk):
-    """Vista para eliminar una cita"""
-    cita = get_object_or_404(Agenda, pk=pk)
+# @login_required
+# def eliminar_cita(request, pk):
+#     """Vista para eliminar una cita"""
+#     cita = get_object_or_404(Agenda, pk=pk)
     
-    if request.method == 'POST':
-        try:
-            cita.delete()
-            messages.success(request, 'Cita eliminada exitosamente.')
-        except Exception as e:
-            messages.error(request, f'Error al eliminar la cita: {str(e)}')
-        return redirect('lista_citas')
+#     if request.method == 'POST':
+#         try:
+#             cita.delete()
+#             messages.success(request, 'Cita eliminada exitosamente.')
+#         except Exception as e:
+#             messages.error(request, f'Error al eliminar la cita: {str(e)}')
+#         return redirect('lista_citas')
     
-    return render(request, 'gestion/citas/eliminar_cita.html', {
-        'titulo': 'Eliminar Cita',
-        'cita': cita
-    })
+#     return render(request, 'gestion/citas/eliminar_cita.html', {
+#         'titulo': 'Eliminar Cita',
+#         'cita': cita
+#     })
 
-@login_required
-@api_view(['GET'])
-def obtener_horas_disponibles(request, fecha):
-    """API para obtener las horas disponibles en una fecha específica"""
-    try:
-        # Convertir la fecha de string a objeto date
-        fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
-        
-        # Obtener las horas ocupadas para la fecha dada
-        horas_ocupadas = list(Agenda.objects.filter(
-            fecha=fecha_obj
-        ).values_list('hora', flat=True))
-        
-        # Generar lista de horas disponibles (de 8:00 a 17:00, cada 30 minutos)
-        horas_disponibles = []
-        hora_actual = dt_time(8, 0)  # Empieza a las 8:00 AM
-        hora_fin = dt_time(17, 0)    # Termina a las 5:00 PM
-        
-        while hora_actual <= hora_fin:
-            # Verificar si la hora actual no está ocupada
-            if hora_actual not in horas_ocupadas:
-                horas_disponibles.append(hora_actual.strftime('%H:%M'))
+# def obtener_horas_disponibles(request, fecha):
+#     """Vista para obtener las horas disponibles para una fecha dada"""
+#     if request.method == 'GET':
+#         # Validar que la fecha sea válida
+#         try:
+#             fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
             
-            # Añadir 30 minutos
-            hora_actual = (datetime.combine(datetime.today(), hora_actual) + 
-                          timedelta(minutes=30)).time()
-        
-        return JsonResponse({'horas_disponibles': horas_disponibles})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+#             # Obtener las horas ocupadas para la fecha dada
+#             horas_ocupadas = list(Agenda.objects.filter(
+#                 fecha=fecha_obj
+#             ).values_list('hora', flat=True))
+            
+#             # Generar lista de horas disponibles (de 9:00 a 18:00, cada 30 minutos)
+#             horas_disponibles = []
+#             hora_actual = datetime.strptime('09:00', '%H:%M').time()
+#             hora_fin = datetime.strptime('18:00', '%H:%M').time()
+            
+#             while hora_actual <= hora_fin:
+#                 if hora_actual not in horas_ocupadas:
+#                     horas_disponibles.append(hora_actual.strftime('%H:%M'))
+#                 # Agregar 30 minutos
+#                 hora_actual = (datetime.combine(datetime.today(), hora_actual) + timedelta(minutes=30)).time()
+            
+#             return JsonResponse({'horas_disponibles': horas_disponibles})
+            
+#         except ValueError:
+#             return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+    
+#     return JsonResponse({'error': 'Método no permitido'}, status=405)
 
-# ========== VISTAS BASADAS EN CLASES ==========
 
 class VehiculoListView(ListView):
     """
@@ -1349,7 +1606,8 @@ ReparacionListCreate.permission_classes = [IsAuthenticated]
 ReparacionRetrieveUpdateDestroy.authentication_classes = [SessionAuthentication]
 ReparacionRetrieveUpdateDestroy.permission_classes = [IsAuthenticated]
 
-AgendaViewSet.authentication_classes = [SessionAuthentication]
-AgendaViewSet.permission_classes = [IsAuthenticated]
-RegistroViewSet.authentication_classes = [SessionAuthentication]
-RegistroViewSet.permission_classes = [IsAuthenticated]
+# Comentado temporalmente hasta que se implementen estos modelos
+# AgendaViewSet.authentication_classes = [SessionAuthentication]
+# AgendaViewSet.permission_classes = [IsAuthenticated]
+# RegistroViewSet.authentication_classes = [SessionAuthentication]
+# RegistroViewSet.permission_classes = [IsAuthenticated]

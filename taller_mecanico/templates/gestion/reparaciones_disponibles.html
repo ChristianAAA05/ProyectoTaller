@@ -1,0 +1,190 @@
+{% extends 'gestion/base.html' %}
+{% load static %}
+
+{% block title %}Reparaciones Disponibles - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-tools me-2"></i>Reparaciones Disponibles
+                </h1>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Volver al Inicio
+                </a>
+            </div>
+            <hr class="mt-2">
+        </div>
+    </div>
+
+    <!-- Mis Reparaciones en Curso -->
+    {% if mis_reparaciones %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-wrench me-2 text-primary"></i>Mis Reparaciones en Curso
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Vehículo</th>
+                                    <th>Servicio</th>
+                                    <th>Fecha de Ingreso</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reparacion in mis_reparaciones %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</strong><br>
+                                        <small class="text-muted">{{ reparacion.vehiculo.patente }}</small>
+                                    </td>
+                                    <td>{{ reparacion.servicio.nombre }}</td>
+                                    <td>{{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">
+                                            {{ reparacion.get_estado_reparacion_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'detalle_reparacion' reparacion.id %}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           data-bs-toggle="tooltip" 
+                                           title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Reparaciones Disponibles -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list-ul me-2 text-success"></i>Reparaciones Disponibles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if reparaciones %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Vehículo</th>
+                                    <th>Servicio</th>
+                                    <th>Fecha de Ingreso</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reparacion in reparaciones %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</strong><br>
+                                        <small class="text-muted">{{ reparacion.vehiculo.patente }}</small>
+                                    </td>
+                                    <td>{{ reparacion.servicio.nombre }}</td>
+                                    <td>{{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        {% if reparacion.estado_reparacion == 'pendiente' %}
+                                            <span class="badge bg-warning text-dark">
+                                        {% elif reparacion.estado_reparacion == 'en_progreso' %}
+                                            <span class="badge bg-primary">
+                                        {% elif reparacion.estado_reparacion == 'completada' %}
+                                            <span class="badge bg-success">
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                        {% endif %}
+                                        {{ reparacion.get_estado_reparacion_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'detalle_reparacion' reparacion.id %}" 
+                                               class="btn btn-sm btn-outline-primary"
+                                               data-bs-toggle="tooltip" 
+                                               title="Ver detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            {% if not reparacion.mecanico_asignado %}
+                                            <a href="{% url 'tomar_reparacion' reparacion.id %}" 
+                                               class="btn btn-sm btn-success"
+                                               data-bs-toggle="tooltip" 
+                                               title="Tomar esta reparación"
+                                               onclick="return confirm('¿Estás seguro de que deseas tomar esta reparación?')">
+                                                <i class="fas fa-hand-paper me-1"></i> Tomar
+                                            </a>
+                                            {% elif reparacion.mecanico_asignado.usuario == request.user %}
+                                            <span class="btn btn-sm btn-outline-secondary"
+                                                  data-bs-toggle="tooltip" 
+                                                  title="Ya tienes esta reparación asignada">
+                                                <i class="fas fa-check me-1"></i> Asignada
+                                            </span>
+                                            {% else %}
+                                            <span class="btn btn-sm btn-outline-secondary"
+                                                  data-bs-toggle="tooltip" 
+                                                  title="Asignada a otro mecánico">
+                                                <i class="fas fa-user-clock me-1"></i> Ocupada
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                                            <p class="mb-0">No hay reparaciones disponibles en este momento.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <div class="text-muted">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p class="mb-0">No hay reparaciones disponibles en este momento.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Inicializar tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+});
+</script>
+{% endblock %}

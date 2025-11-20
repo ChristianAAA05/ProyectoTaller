@@ -1,0 +1,363 @@
+{% extends 'gestion/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado con botón de volver -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'reparaciones_disponibles' %}">Reparaciones</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Detalle #{{ reparacion.id }}</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-tools me-2"></i>Detalle de Reparación #{{ reparacion.id }}
+                </h1>
+                <div class="btn-group">
+                    <a href="{% url 'reparaciones_disponibles' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Volver
+                    </a>
+                    {% if reparacion.mecanico_asignado == user.empleado or user.is_superuser %}
+                    <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cambiarEstadoModal">
+                        <i class="fas fa-sync-alt me-1"></i> Cambiar Estado
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Tarjeta de resumen de la reparación -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Información de la Reparación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Vehículo</h5>
+                            <ul class="list-unstyled">
+                                <li><strong>Marca/Modelo:</strong> {{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</li>
+                                <li><strong>Año:</strong> {{ reparacion.vehiculo.anio }}</li>
+                                <li><strong>Patente:</strong> {{ reparacion.vehiculo.patente }}</li>
+                                <li><strong>VIN:</strong> {{ reparacion.vehiculo.vin|default:"No especificado" }}</li>
+                                <li><strong>Color:</strong> {{ reparacion.vehiculo.color|default:"No especificado" }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Detalles del Servicio</h5>
+                            <ul class="list-unstyled">
+                                <li><strong>Servicio:</strong> {{ reparacion.servicio.nombre }}</li>
+                                <li><strong>Fecha de Ingreso:</strong> {{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}</li>
+                                <li><strong>Estado:</strong> 
+                                    <span class="badge 
+                                    {% if reparacion.estado_reparacion == 'pendiente' %}bg-warning text-dark
+                                    {% elif reparacion.estado_reparacion == 'en_progreso' %}bg-primary
+                                    {% elif reparacion.estado_reparacion == 'completada' %}bg-success
+                                    {% else %}bg-secondary{% endif %}">
+                                        {{ reparacion.get_estado_reparacion_display }}
+                                    </span>
+                                </li>
+                                <li><strong>Mecánico Asignado:</strong> 
+                                    {% if reparacion.mecanico_asignado %}
+                                        {{ reparacion.mecanico_asignado.get_nombre_completo }}
+                                    {% else %}
+                                        <span class="text-muted">Sin asignar</span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Condición del Vehículo:</strong> {{ reparacion.get_condicion_vehiculo_display }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if reparacion.notas %}
+                    <div class="mt-3">
+                        <h5>Notas Adicionales</h5>
+                        <div class="border rounded p-3 bg-light">
+                            {{ reparacion.notas|linebreaks }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tareas de la reparación -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>Tareas
+                    </h5>
+                    {% if reparacion.mecanico_asignado == user.empleado or user.is_superuser %}
+                    <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaTareaCollapse" aria-expanded="false" aria-controls="nuevaTareaCollapse">
+                        <i class="fas fa-plus me-1"></i> Nueva Tarea
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <!-- Formulario para nueva tarea (colapsable) -->
+                    {% if reparacion.mecanico_asignado == user.empleado or user.is_superuser %}
+                    <div class="collapse mb-4" id="nuevaTareaCollapse">
+                        <div class="card card-body border-0 shadow-sm">
+                            <h5 class="mb-3">Agregar Nueva Tarea</h5>
+                            <form method="post" action="{% url 'detalle_reparacion' reparacion.id %}">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ tarea_form.titulo.id_for_label }}" class="form-label">Título</label>
+                                            {{ tarea_form.titulo }}
+                                            {% if tarea_form.titulo.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ tarea_form.titulo.errors.0 }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ tarea_form.estado.id_for_label }}" class="form-label">Estado</label>
+                                            {{ tarea_form.estado }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="{{ tarea_form.descripcion.id_for_label }}" class="form-label">Descripción</label>
+                                    {{ tarea_form.descripcion }}
+                                    {% if tarea_form.descripcion.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ tarea_form.descripcion.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#nuevaTareaCollapse">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> Guardar Tarea
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Lista de tareas -->
+                    {% if tareas %}
+                        <div class="list-group">
+                            {% for tarea in tareas %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-tasks me-2"></i>{{ tarea.titulo }}
+                                        <span class="badge ms-2 {% if tarea.estado == 'pendiente' %}bg-warning text-dark
+                                            {% elif tarea.estado == 'en_progreso' %}bg-primary
+                                            {% elif tarea.estado == 'completada' %}bg-success
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ tarea.get_estado_display }}
+                                        </span>
+                                    </h6>
+                                    <small class="text-muted">{{ tarea.fecha_creacion|timesince }}</small>
+                                </div>
+                                <p class="mb-1">{{ tarea.descripcion|linebreaksbr }}</p>
+                                <small class="text-muted">Creada por: {{ tarea.creada_por.get_full_name|default:tarea.creada_por.username }}</small>
+                                
+                                {% if tarea.actualizada_por %}
+                                    <br>
+                                    <small class="text-muted">Última actualización: {{ tarea.fecha_actualizacion|timesince }} por {{ tarea.actualizada_por.get_full_name|default:tarea.actualizada_por.username }}</small>
+                                {% endif %}
+                                
+                                {% if reparacion.mecanico_asignado == user.empleado or user.is_superuser %}
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'en_progreso')"
+                                            {% if tarea.estado == 'en_progreso' %}disabled{% endif %}>
+                                        <i class="fas fa-play me-1"></i> En Progreso
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" 
+                                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'completada')"
+                                            {% if tarea.estado == 'completada' %}disabled{% endif %}>
+                                        <i class="fas fa-check me-1"></i> Completar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="cambiarEstadoTarea({{ tarea.id }}, 'pendiente')"
+                                            {% if tarea.estado == 'pendiente' %}disabled{% endif %}>
+                                        <i class="fas fa-undo me-1"></i> Revertir
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="fas fa-inbox fa-3x mb-3"></i>
+                                <p class="mb-0">No hay tareas registradas para esta reparación.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de cambios -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Historial de Cambios
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if historial %}
+                        <div class="timeline">
+                            {% for registro in historial %}
+                            <div class="timeline-item">
+                                <div class="timeline-marker">
+                                    {% if registro.accion == 'creada' %}
+                                        <i class="fas fa-plus-circle text-success"></i>
+                                    {% elif registro.accion == 'actualizada' %}
+                                        <i class="fas fa-edit text-primary"></i>
+                                    {% elif registro.accion == 'completada' %}
+                                        <i class="fas fa-check-circle text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-secondary"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="d-flex justify-content-between">
+                                        <h6 class="mb-1">
+                                            {% if registro.tarea %}
+                                                Tarea: {{ registro.tarea.titulo }}
+                                            {% else %}
+                                                Reparación #{{ reparacion.id }}
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted">{{ registro.fecha_cambio|timesince }} atrás</small>
+                                    </div>
+                                    <p class="mb-1">{{ registro.descripcion }}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>{{ registro.usuario.get_full_name|default:registro.usuario.username }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="fas fa-inbox fa-3x mb-3"></i>
+                                <p class="mb-0">No hay registros en el historial.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para cambiar estado de la reparación -->
+{% if reparacion.mecanico_asignado == user.empleado or user.is_superuser %}
+<div class="modal fade" id="cambiarEstadoModal" tabindex="-1" aria-labelledby="cambiarEstadoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cambiarEstadoModalLabel">Cambiar Estado de la Reparación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="cambiarEstadoForm" method="post" action="{% url 'cambiar_estado_reparacion' reparacion.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nuevo_estado" class="form-label">Nuevo Estado</label>
+                        <select class="form-select" id="nuevo_estado" name="nuevo_estado" required>
+                            {% for valor, etiqueta in estados_reparacion %}
+                                <option value="{{ valor }}" {% if valor == reparacion.estado_reparacion %}selected{% endif %}>
+                                    {{ etiqueta }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comentario" class="form-label">Comentario (opcional)</label>
+                        <textarea class="form-control" id="comentario" name="comentario" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Función para cambiar el estado de una tarea
+function cambiarEstadoTarea(tareaId, nuevoEstado) {
+    if (confirm('¿Estás seguro de que deseas actualizar el estado de esta tarea?')) {
+        const url = `/api/tareas/${tareaId}/cambiar_estado/`;
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                estado: nuevoEstado,
+                comentario: 'Cambio de estado desde la interfaz'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Recargar la página para ver los cambios
+                window.location.reload();
+            } else {
+                alert('Error al actualizar la tarea: ' + (data.error || 'Error desconocido'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al conectar con el servidor');
+        });
+    }
+}
+
+// Inicializar tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+});
+
+// Inicializar popovers
+var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+    return new bootstrap.Popover(popoverTriggerEl);
+});
+</script>
+{% endblock %}
