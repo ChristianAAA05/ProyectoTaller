@@ -18,8 +18,9 @@ from rest_framework.routers import DefaultRouter
 # ========== CONFIGURACIÓN DEL ROUTER ==========
 # Router automático para ViewSets que genera URLs REST estándar
 router = DefaultRouter()
-router.register(r'agendas', views.AgendaViewSet)      # URLs para citas: /agendas/, /agendas/{id}/
-router.register(r'registros', views.RegistroViewSet)  # URLs para registros: /registros/, /registros/{id}/
+# Comentado temporalmente hasta que se implementen estos ViewSets
+# router.register(r'agendas', views.AgendaViewSet)      # URLs para citas: /agendas/, /agendas/{id}/
+# router.register(r'registros', views.RegistroViewSet)  # URLs para registros: /registros/, /registros/{id}/
 
 # ========== PATRÓN DE URLS ==========
 # Las URLs siguen el patrón estándar de Django:
@@ -43,11 +44,19 @@ urlpatterns = [
     # Dashboard para el encargado
     path('dashboard-encargado/', views.dashboard_encargado, name='dashboard_encargado'),
     
+    # Dashboard para el mecánico
+    path('dashboard-mecanico/', views.dashboard_mecanico, name='dashboard_mecanico'),
+    
+    # Gestión de tareas
+    path('tareas/', views.listar_tareas, name='listar_tareas'),
+    path('tareas/editar/<int:pk>/', views.editar_tarea, name='editar_tarea'),
+    
     # Dashboard de reparaciones
     path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
     path('reparaciones/nueva/', views.crear_reparacion, name='crear_reparacion'),
     path('reparaciones/editar/<int:pk>/', views.editar_reparacion, name='editar_reparacion'),
     path('reparaciones/eliminar/<int:pk>/', views.eliminar_reparacion, name='eliminar_reparacion'),
+    path('reparaciones/<int:repair_id>/tomar/', views.tomar_reparacion, name='tomar_reparacion'),
     # Reportes
     path('reportes/ingresos/', views.reportes_ingresos, name='reportes_ingresos'),
     path('reportes/ingresos/exportar/', views.exportar_ingresos_excel, name='exportar_ingresos_excel'),
@@ -104,34 +113,55 @@ urlpatterns = [
     path('empleados/eliminar/<int:pk>/', views.empleados_eliminar, name='empleados-eliminar'),  # Confirmación para eliminar empleado
 
     # ========== GESTIÓN DE CITAS ==========
-    path('citas/', views.lista_citas, name='lista_citas'),
-    path('citas/nueva/', views.crear_cita, name='crear_cita'),
-    path('citas/editar/<int:pk>/', views.editar_cita, name='editar_cita'),
-    path('citas/eliminar/<int:pk>/', views.eliminar_cita, name='eliminar_cita'),
-    path('citas/agregar/', views.crear_cita, name='agregar_cita'),  # Alias para consistencia
-    path('citas/<int:pk>/', views.detalle_cita, name='detalle_cita'),  # Vista detallada de cita
-    
-    # ========== GESTIÓN DE TAREAS ==========
-    path('tareas/', views.listar_tareas, name='lista_tareas'),
-    path('tareas/crear/', views.crear_tarea, name='crear_tarea'),
-    path('tareas/editar/<int:tarea_id>/', views.editar_tarea, name='editar_tarea'),
-    path('tareas/eliminar/<int:tarea_id>/', views.eliminar_tarea, name='eliminar_tarea'),
-    path('tareas/cambiar-estado/<int:tarea_id>/<str:nuevo_estado>/', views.cambiar_estado_tarea, name='cambiar_estado_tarea'),
-    
-    # ========== GESTIÓN DE SERVICIOS ==========
-    path('servicios/lista/', views.servicios_lista, name='servicios-lista'),          # Listar todos los servicios
-    path('servicios/crear/', views.servicios_crear, name='servicios-crear'),           # Formulario para crear servicio
-    path('servicios/editar/<int:pk>/', views.servicios_editar, name='servicios-editar'),  # Formulario para editar servicio
-    path('servicios/eliminar/<int:pk>/', views.servicios_eliminar, name='servicios-eliminar'),  # Confirmación para eliminar servicio
+    # Comentado temporalmente hasta que se implementen las vistas de citas
+    # path('citas/', views.citas_lista, name='citas-lista'),
+    # path('citas/crear/', views.cita_crear, name='cita-crear'),
+    # path('citas/editar/<int:pk>/', views.cita_editar, name='cita-editar'),
+    # path('citas/eliminar/<int:pk>/', views.cita_eliminar, name='cita-eliminar'),
 
+    # ========== GESTIÓN DE INVENTARIO ==========
+    # Comentado temporalmente hasta que se implementen las vistas de inventario
+    # path('inventario/', views.inventario_lista, name='inventario-lista'),
+    # path('inventario/agregar/', views.inventario_agregar, name='inventario-agregar'),
+    # path('inventario/editar/<int:pk>/', views.inventario_editar, name='inventario-editar'),
+    # path('inventario/eliminar/<int:pk>/', views.inventario_eliminar, name='inventario-eliminar'),
+
+    # ========== GESTIÓN DE FACTURAS ==========
+    # Comentado temporalmente hasta que se implementen las vistas de facturas
+    # path('facturas/', views.facturas_lista, name='facturas-lista'),
+    # path('facturas/crear/', views.factura_crear, name='factura-crear'),
+    # path('facturas/ver/<int:pk>/', views.factura_ver, name='factura-ver'),
+    # path('facturas/eliminar/<int:pk>/', views.factura_eliminar, name='factura-eliminar'),
+
+    # ========== GESTIÓN DE REPARACIONES ==========
+    path('reparaciones/disponibles/', views.listar_reparaciones_disponibles, name='reparaciones_disponibles'),
+    path('reparaciones/<int:reparacion_id>/tomar/', views.tomar_reparacion, name='tomar_reparacion'),
+    path('reparaciones/<int:pk>/', views.detalle_reparacion, name='detalle_reparacion'),
+
+    # ========== REPORTES ==========
+    # Comentado temporalmente hasta que se implementen las vistas de reportes
+    # path('reportes/', views.reportes, name='reportes'),
+    # path('reportes/ventas/', views.reporte_ventas, name='reporte-ventas'),
+    # path('reportes/inventario/', views.reporte_inventario, name='reporte-inventario'),
+    # path('reportes/ingresos/', views.reportes_ingresos, name='reporte-ingresos'),
+    # path('reportes/ingresos/exportar/', views.exportar_ingresos_excel, name='exportar-ingresos-excel'),
+    # path('ajax/load-precio-servicio/', views.ajax_load_precio_servicio, name='ajax-load-precio-servicio'),
+
+    # ========== OTRAS RUTAS ==========
+    path('', views.inicio, name='home'),  # Ruta raíz que redirige al inicio
+    # Comentado temporalmente hasta que se implementen las vistas
+    # path('acerca-de/', views.acerca_de, name='acerca-de'),
+    # path('contacto/', views.contacto, name='contacto'),
+    
     # ========== GESTIÓN DE CITAS ==========
-    path('citas/', views.lista_citas, name='lista_citas'),
-    path('citas/nueva/', views.crear_cita, name='crear_cita'),
-    path('citas/<int:pk>/editar/', views.editar_cita, name='editar_cita'),
-    path('citas/<int:pk>/eliminar/', views.eliminar_cita, name='eliminar_cita'),
+    # Comentado temporalmente hasta que se implementen las vistas de citas
+    # path('citas/', views.lista_citas, name='lista_citas'),
+    # path('citas/nueva/', views.crear_cita, name='crear_cita'),
+    # path('citas/<int:pk>/editar/', views.editar_cita, name='editar_cita'),
+    # path('citas/<int:pk>/eliminar/', views.eliminar_cita, name='eliminar_cita'),
 
     # API para horas disponibles de agenda
-    path('api/agenda/horas-disponibles/<str:fecha>/', views.obtener_horas_disponibles, name='obtener_horas_disponibles'),
+    # path('api/agenda/horas-disponibles/<str:fecha>/', views.obtener_horas_disponibles, name='obtener_horas_disponibles'),
 
     # ========== INCLUSIÓN DE ROUTERS ==========
     # Incluye automáticamente las URLs generadas por el router para ViewSets

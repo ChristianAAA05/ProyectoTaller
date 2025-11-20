@@ -158,6 +158,15 @@ class Reparacion(models.Model):
     
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='reparaciones')
     servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE)
+    mecanico_asignado = models.ForeignKey(
+        'Empleado', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='reparaciones_asignadas',
+        verbose_name='Mecánico Asignado',
+        help_text='Mecánico responsable de la reparación'
+    )
     fecha_ingreso = models.DateTimeField(auto_now_add=True)  # Fecha automática de ingreso
     fecha_salida = models.DateTimeField(null=True, blank=True)  # Fecha de entrega
     condicion_vehiculo = models.CharField(
@@ -277,18 +286,48 @@ class Tarea(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADOS_TAREA, default='por_hacer')
     prioridad = models.CharField(max_length=10, choices=PRIORIDAD_CHOICES, default='media')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
     fecha_limite = models.DateField(null=True, blank=True)
+    
+    # Relaciones
+    reparacion = models.ForeignKey('Reparacion', on_delete=models.CASCADE, related_name='tareas', null=True, blank=True)
     creada_por = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tareas_creadas')
+    actualizada_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tareas_actualizadas')
     asignada_a = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tareas_asignadas')
+    
     etiqueta = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return self.titulo
+        
+    def save(self, *args, **kwargs):
+        # Actualizar la fecha de actualización al guardar
+        self.fecha_actualizacion = timezone.now()
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Tarea'
         verbose_name_plural = 'Tareas'
         ordering = ['-fecha_creacion']
+
+
+class TareaHistorial(models.Model):
+    """
+    Modelo para registrar el historial de cambios en las tareas.
+    """
+    tarea = models.ForeignKey(Tarea, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='tareas_historial')
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=50)  # creada, actualizada, completada, etc.
+    descripcion = models.TextField()
+    
+    class Meta:
+        verbose_name = 'Historial de Tarea'
+        verbose_name_plural = 'Historial de Tareas'
+        ordering = ['-fecha_cambio']
+    
+    def __str__(self):
+        return f"{self.tarea.titulo} - {self.accion} por {self.usuario.username if self.usuario else 'Sistema'}"
 
 # ========== SIGNALS Y AUTOMATIZACIÓN ==========
 
