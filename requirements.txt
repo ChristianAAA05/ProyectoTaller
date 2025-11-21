@@ -2,7 +2,11 @@ asgiref==3.9.1
 Django==5.2.8
 djangorestframework==3.16.1
 et_xmlfile==2.0.0
-mysqlclient==2.2.7
 openpyxl==3.1.5
 sqlparse==0.5.3
 xlsxwriter==3.2.9
+
+# MySQL/MariaDB support (opcional - ver requirements-optional.txt)
+# Si necesitas soporte para MySQL/MariaDB, instala:
+# pip install mysqlclient==2.2.7
+# Requiere: libmariadb-dev o mariadb-libs en tu sistema
