@@ -1,0 +1,34 @@
+# Dependencias opcionales para el proyecto Taller Mecánico
+#
+# Para instalar estas dependencias:
+#   pip install -r requirements-optional.txt
+#
+# IMPORTANTE: Algunas de estas dependencias requieren bibliotecas del sistema
+
+# ========================================
+# MySQL/MariaDB Support
+# ========================================
+# Para usar MySQL/MariaDB en lugar de SQLite
+#
+# Requisitos del sistema:
+#   - Debian/Ubuntu: sudo apt-get install libmariadb-dev pkg-config
+#   - Fedora/RHEL:   sudo dnf install mariadb-devel
+#   - Arch/CachyOS:  sudo pacman -S mariadb-libs pkg-config
+#   - macOS:         brew install mysql-client pkg-config
+#
+mysqlclient==2.2.7
+
+# ========================================
+# PostgreSQL Support
+# ========================================
+# Para usar PostgreSQL (alternativa a MySQL)
+# Descomentar si se necesita:
+# psycopg2-binary==2.9.9
+
+# ========================================
+# Producción
+# ========================================
+# Servidor WSGI para producción
+# Descomentar si se necesita:
+# gunicorn==21.2.0
+# whitenoise==6.6.0  # Servir archivos estáticos en producción
