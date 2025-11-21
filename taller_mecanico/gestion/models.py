@@ -19,7 +19,6 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import User
 
 # Modelo de Perfil de usuario personalizado
 # Extiende el modelo User de Django con información adicional específica del taller
@@ -236,7 +235,7 @@ class Registro(models.Model):
     Mantiene un historial completo de todos los servicios prestados.
     """
     cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE)
-    empleado = models.ForeignKey('empleado', on_delete=models.CASCADE)
+    empleado = models.ForeignKey('Empleado', on_delete=models.CASCADE)
     servicio = models.ForeignKey('Servicio', on_delete=models.CASCADE)
     fecha = models.DateField(default=timezone.now)
 

@@ -117,7 +117,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ========== INTERNACIONALIZACIÓN ==========
 LANGUAGE_CODE = 'es'  # Idioma español
-TIME_ZONE = 'America/Asuncion'  # Zona horaria de Argentina
+TIME_ZONE = 'America/Asuncion'  # Zona horaria de Paraguay
 USE_I18N = True  # Internacionalización habilitada
 USE_TZ = True    # Zona horaria habilitada
 

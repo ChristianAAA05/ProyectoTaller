@@ -1,6 +1,7 @@
-from django.forms import formset_factory
+from django.forms import formset_factory, inlineformset_factory
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, View
 from django.urls import reverse_lazy, reverse
@@ -18,10 +19,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
-from django.contrib.auth import get_user_model
+from io import BytesIO
+import csv
 from .models import (
-    Cliente, Vehiculo, Servicio, Empleado, Reparacion, Tarea, 
-    TareaHistorial  # Solo importar modelos definidos
+    Cliente, Vehiculo, Servicio, Empleado, Reparacion, Tarea,
+    TareaHistorial, Agenda, Registro
 )
 from .forms import (
     ClienteForm, VehiculoForm, ServicioForm, EmpleadoForm, 
@@ -602,8 +604,10 @@ def crear_reparacion(request):
             messages.success(request, 'Reparación creada correctamente.')
             return redirect('dashboard_reparaciones')
         else:
-            # Si el formulario no es válido, mostrar errores en la consola para depuración
-            print("Errores del formulario:", form.errors)
+            # Si el formulario no es válido, agregar los errores a los mensajes
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
     else:
         # Inicializar el formulario con valores por defecto
         form = ReparacionForm(initial={
