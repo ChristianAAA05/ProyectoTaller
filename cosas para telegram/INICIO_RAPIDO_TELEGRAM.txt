@@ -1,0 +1,249 @@
+===============================================================================
+🚀 INICIO RÁPIDO - BOT DE TELEGRAM
+===============================================================================
+
+OPCIÓN 1: IMPLEMENTACIÓN BÁSICA (15 minutos)
+--------------------------------------------
+
+PASO 1 - Crear el bot en Telegram
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Abre Telegram y busca: @BotFather
+2. Envía: /newbot
+3. Nombre: "Taller Mecánico Bot"
+4. Username: "taller_mecanico_bot"
+5. Copia el TOKEN que te da BotFather
+
+
+PASO 2 - Instalar librería
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cd "/home/christian/proyecto Py/ProyectoTaller"
+source abel_env/bin/activate
+pip install python-telegram-bot==20.7
+
+
+PASO 3 - Configurar token en settings.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Agregar al final de taller_mecanico/settings.py:
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN = 'TU_TOKEN_AQUI'
+
+
+PASO 4 - Copiar archivo del bot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cp ejemplo_telegram_bot.py taller_mecanico/gestion/telegram_bot.py
+
+
+PASO 5 - Copiar script de ejecución
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cp ejemplo_run_telegram_bot.py taller_mecanico/run_telegram_bot.py
+chmod +x taller_mecanico/run_telegram_bot.py
+
+
+PASO 6 - Ejecutar el bot
+~~~~~~~~~~~~~~~~~~~~~~~~~
+cd taller_mecanico
+python run_telegram_bot.py
+
+
+PASO 7 - Probar en Telegram
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Busca tu bot en Telegram: @taller_mecanico_bot
+2. Envía: /start
+3. Prueba: /estado ABC123 (con una placa real de tu BD)
+
+✅ ¡LISTO! Tu bot está funcionando en modo desarrollo.
+
+
+===============================================================================
+
+OPCIÓN 2: IMPLEMENTACIÓN CON NOTIFICACIONES (30 minutos)
+--------------------------------------------------------
+
+Incluye todo lo anterior MÁS:
+
+PASO 8 - Agregar campos al modelo Cliente
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+En gestion/models.py, clase Cliente, agregar:
+
+    telegram_chat_id = models.CharField(
+        max_length=50, blank=True, null=True,
+        verbose_name='Telegram Chat ID'
+    )
+
+
+PASO 9 - Crear migración
+~~~~~~~~~~~~~~~~~~~~~~~~~
+python manage.py makemigrations
+python manage.py migrate
+
+
+PASO 10 - Crear señal para notificaciones
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Crear archivo: gestion/signals.py
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import Reparacion
+import requests
+from django.conf import settings
+
+@receiver(post_save, sender=Reparacion)
+def notificar_cambio_estado(sender, instance, created, **kwargs):
+    if instance.estado_reparacion == 'completada' and instance.fecha_salida:
+        cliente = instance.vehiculo.cliente
+        if cliente.telegram_chat_id:
+            mensaje = f"""
+✅ ¡Tu vehículo está listo!
+
+{instance.vehiculo.marca} {instance.vehiculo.modelo}
+Placa: {instance.vehiculo.placa}
+
+Puedes pasar a retirar tu vehículo.
+            """
+            url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+            requests.post(url, json={
+                'chat_id': cliente.telegram_chat_id,
+                'text': mensaje
+            })
+
+
+PASO 11 - Registrar señales en apps.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+En gestion/apps.py:
+
+    def ready(self):
+        import gestion.signals
+
+
+PASO 12 - Vincular un cliente de prueba
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+En el admin de Django:
+1. Editar un cliente
+2. Agregar su telegram_chat_id (lo obtiene con /vincular en el bot)
+3. Guardar
+
+
+PASO 13 - Probar notificación
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Marca una reparación como "completada"
+2. El cliente debería recibir notificación en Telegram
+
+✅ ¡Bot con notificaciones funcionando!
+
+
+===============================================================================
+
+COMANDOS DISPONIBLES EN EL BOT:
+-------------------------------
+
+/start      - Iniciar el bot
+/help       - Ver ayuda
+/estado     - Consultar estado de reparación (ej: /estado ABC123)
+/contacto   - Ver info del taller
+/agendar    - Solicitar cita
+/vincular   - Vincular cuenta de Telegram
+
+También puedes escribir directamente una placa sin comando.
+
+
+===============================================================================
+
+ESTRUCTURA DE ARCHIVOS:
+-----------------------
+
+proyecto/
+├── taller_mecanico/
+│   ├── gestion/
+│   │   ├── telegram_bot.py          ← Lógica del bot
+│   │   ├── signals.py                ← Notificaciones automáticas
+│   │   └── management/
+│   │       └── commands/
+│   │           └── vincular_telegram.py
+│   ├── run_telegram_bot.py           ← Script para ejecutar bot
+│   ├── settings.py                   ← Configuración
+│   └── .env                          ← Variables de entorno
+└── GUIA_BOT_TELEGRAM.txt             ← Esta guía
+
+
+===============================================================================
+
+PRÓXIMOS PASOS RECOMENDADOS:
+----------------------------
+
+1. 📱 Implementar comando /vincular para que clientes vinculen sus cuentas
+2. 🔔 Agregar notificaciones para más eventos (inicio de reparación, etc)
+3. 📊 Crear comando para ver estadísticas (mecánicos)
+4. 📅 Implementar agendamiento completo vía bot
+5. 🌐 Configurar webhook para producción (en lugar de polling)
+6. 🔒 Agregar autenticación para comandos administrativos
+7. 📈 Implementar analytics y logs de uso
+
+
+===============================================================================
+
+CASOS DE USO PRÁCTICOS:
+-----------------------
+
+✅ Cliente consulta estado de su reparación 24/7
+✅ Notificación automática cuando vehículo está listo
+✅ Recordatorios de citas programadas
+✅ Mecánicos reciben notificación de nueva asignación
+✅ Alertas de tareas urgentes
+✅ Confirmación de agendamiento de citas
+✅ Recordatorios de mantenimiento preventivo
+
+
+===============================================================================
+
+SOLUCIÓN DE PROBLEMAS:
+---------------------
+
+❌ Error: "TELEGRAM_BOT_TOKEN not configured"
+   ✅ Verifica que el token esté en settings.py
+
+❌ Bot no responde
+   ✅ Verifica que run_telegram_bot.py esté ejecutándose
+   ✅ Revisa la consola para ver errores
+
+❌ Error de permisos
+   ✅ Asegúrate de que el bot tenga permisos para enviar mensajes
+
+❌ No recibe notificaciones
+   ✅ Verifica que el cliente tenga telegram_chat_id guardado
+   ✅ Verifica que las señales estén registradas en apps.py
+
+
+===============================================================================
+
+RECURSOS ÚTILES:
+---------------
+
+📚 Documentación oficial:
+   https://core.telegram.org/bots/api
+
+📚 python-telegram-bot:
+   https://docs.python-telegram-bot.org/
+
+📚 Ejemplos:
+   https://github.com/python-telegram-bot/python-telegram-bot/tree/master/examples
+
+💬 Comunidad:
+   https://t.me/pythontelegrambotgroup
+
+
+===============================================================================
+
+¿NECESITAS AYUDA?
+-----------------
+
+Si tienes problemas o preguntas, puedes:
+1. Revisar los archivos de ejemplo
+2. Consultar la documentación oficial
+3. Revisar el código en telegram_bot.py
+4. Activar modo debug para ver errores detallados
+
+
+===============================================================================
+FIN - ¡Éxito con tu bot! 🤖
+===============================================================================

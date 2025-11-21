@@ -1,0 +1,258 @@
+===============================================================================
+GUÍA COMPLETA: IMPLEMENTACIÓN DE BOT DE TELEGRAM EN DJANGO
+===============================================================================
+
+PASO 1: CREAR EL BOT EN TELEGRAM
+---------------------------------
+
+1. Abrir Telegram y buscar: @BotFather
+2. Enviar comando: /newbot
+3. Seguir instrucciones:
+   - Nombre: "Taller Mecánico Bot"
+   - Username: "taller_mecanico_bot" (debe terminar en 'bot')
+4. Guardar el TOKEN que te proporciona BotFather
+
+Ejemplo de TOKEN:
+123456789:ABCdefGHIjklMNOpqrsTUVwxyz-1234567890
+
+
+PASO 2: INSTALAR LIBRERÍAS NECESARIAS
+--------------------------------------
+
+cd "/home/christian/proyecto Py/ProyectoTaller"
+source abel_env/bin/activate
+pip install python-telegram-bot==20.7
+pip install django-environ
+
+
+PASO 3: CONFIGURAR VARIABLES DE ENTORNO
+----------------------------------------
+
+Crear archivo: taller_mecanico/.env
+
+Contenido:
+---------
+SECRET_KEY=tu-secret-key-actual
+DEBUG=True
+TELEGRAM_BOT_TOKEN=TU_TOKEN_AQUI
+TELEGRAM_WEBHOOK_URL=https://tu-dominio.com/telegram/webhook/
+
+
+PASO 4: ACTUALIZAR SETTINGS.PY
+-------------------------------
+
+Agregar al inicio del archivo (después de imports):
+
+import os
+import environ
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+# Token del bot de Telegram
+TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
+
+
+PASO 5: CREAR ARCHIVO DEL BOT
+------------------------------
+
+Crear: taller_mecanico/gestion/telegram_bot.py
+
+Ver código completo en el ejemplo adjunto.
+
+
+PASO 6: CREAR VISTA PARA WEBHOOK
+---------------------------------
+
+Agregar en gestion/views.py:
+
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
+from .telegram_bot import procesar_mensaje_telegram
+
+@csrf_exempt
+def telegram_webhook(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            procesar_mensaje_telegram(data)
+            return JsonResponse({'ok': True})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+PASO 7: AGREGAR URL
+-------------------
+
+En gestion/urls.py agregar:
+
+path('telegram/webhook/', views.telegram_webhook, name='telegram_webhook'),
+
+
+PASO 8: CONFIGURAR WEBHOOK (PRODUCCIÓN)
+----------------------------------------
+
+Opción A - Usando script Python:
+--------------------------------
+
+import requests
+
+TOKEN = "TU_TOKEN_AQUI"
+WEBHOOK_URL = "https://tu-dominio.com/telegram/webhook/"
+
+url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
+response = requests.post(url, json={"url": WEBHOOK_URL})
+print(response.json())
+
+
+Opción B - Usando curl:
+-----------------------
+
+curl -X POST \
+  https://api.telegram.org/bot<TOKEN>/setWebhook \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://tu-dominio.com/telegram/webhook/"}'
+
+
+PASO 9: DESARROLLO LOCAL CON POLLING
+-------------------------------------
+
+Para desarrollo local, usar polling en lugar de webhook.
+
+Crear: taller_mecanico/run_telegram_bot.py
+
+import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'taller_mecanico.settings')
+django.setup()
+
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from gestion.telegram_bot import (
+    start_command, 
+    help_command, 
+    estado_command,
+    mensaje_texto
+)
+
+def main():
+    # Token del bot
+    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    
+    # Crear aplicación
+    app = Application.builder().token(TOKEN).build()
+    
+    # Registrar comandos
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("estado", estado_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mensaje_texto))
+    
+    # Iniciar bot en modo polling
+    print("Bot iniciado en modo polling...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == '__main__':
+    main()
+
+Ejecutar:
+python run_telegram_bot.py
+
+
+CASOS DE USO PARA EL TALLER MECÁNICO
+-------------------------------------
+
+✅ Notificaciones automáticas a clientes:
+   - Reparación iniciada
+   - Reparación completada
+   - Vehículo listo para retirar
+   - Recordatorios de mantenimiento
+
+✅ Consultas de estado:
+   /estado PLACA123 → Ver estado de su reparación
+
+✅ Agendar citas:
+   /agendar → Iniciar proceso de agendamiento
+
+✅ Notificaciones para mecánicos:
+   - Nueva reparación asignada
+   - Tareas urgentes
+   - Actualizaciones de prioridad
+
+✅ Alertas administrativas:
+   - Resumen diario de reparaciones
+   - Alertas de inventario bajo
+   - Recordatorios de seguimiento
+
+
+COMANDOS BÁSICOS DEL BOT
+-------------------------
+
+/start - Iniciar el bot y ver opciones
+/help - Ver ayuda y comandos disponibles
+/estado - Consultar estado de reparación
+/agendar - Agendar una cita
+/contacto - Información de contacto del taller
+
+
+SEGURIDAD Y MEJORES PRÁCTICAS
+------------------------------
+
+⚠️ NUNCA subir el TOKEN a GitHub
+✅ Usar variables de entorno (.env)
+✅ Agregar .env al .gitignore
+✅ Validar usuarios autorizados
+✅ Registrar logs de interacciones
+✅ Limitar rate de mensajes
+
+
+TESTING LOCAL
+--------------
+
+1. Ejecutar servidor Django:
+   python manage.py runserver
+
+2. En otra terminal, ejecutar bot:
+   python run_telegram_bot.py
+
+3. Buscar tu bot en Telegram y enviar:
+   /start
+
+
+DEPLOYMENT EN PRODUCCIÓN
+-------------------------
+
+1. Configurar servidor web (nginx + gunicorn)
+2. Obtener certificado SSL (Let's Encrypt)
+3. Configurar webhook en Telegram
+4. Usar supervisor o systemd para mantener el bot activo
+5. Configurar logs y monitoreo
+
+
+LIBRERÍAS ALTERNATIVAS
+-----------------------
+
+- python-telegram-bot (Recomendada) ⭐
+- aiogram (Asíncrona, moderna)
+- telebot (pyTelegramBotAPI)
+- python-telegram
+
+
+RECURSOS ÚTILES
+----------------
+
+Documentación oficial:
+https://core.telegram.org/bots/api
+
+python-telegram-bot docs:
+https://docs.python-telegram-bot.org/
+
+Ejemplos:
+https://github.com/python-telegram-bot/python-telegram-bot/tree/master/examples
+
+===============================================================================
+FIN DE LA GUÍA
+===============================================================================

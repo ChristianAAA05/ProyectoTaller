@@ -1,0 +1,47 @@
+# ============================================================
+# ARCHIVO .env PARA TELEGRAM BOT
+# Ubicación: taller_mecanico/.env
+# ============================================================
+
+# Django Settings
+SECRET_KEY=django-insecure-tu-secret-key-aqui
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database (si usas PostgreSQL en producción)
+# DATABASE_URL=postgresql://usuario:password@localhost/taller_db
+
+# Telegram Bot Configuration
+# Obtén tu token desde @BotFather en Telegram
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz-1234567890
+
+# Webhook URL (solo para producción)
+# TELEGRAM_WEBHOOK_URL=https://tu-dominio.com/telegram/webhook/
+
+# Email Settings (opcional)
+# EMAIL_HOST=smtp.gmail.com
+# EMAIL_PORT=587
+# EMAIL_HOST_USER=tu-email@gmail.com
+# EMAIL_HOST_PASSWORD=tu-password
+# EMAIL_USE_TLS=True
+
+# ============================================================
+# IMPORTANTE:
+# 1. Este archivo NO debe subirse a GitHub
+# 2. Agregar .env al archivo .gitignore
+# 3. Crear .env.example con valores de ejemplo (sin datos reales)
+# ============================================================
+
+
+# ============================================================
+# PASOS PARA OBTENER EL TOKEN:
+# ============================================================
+# 1. Abre Telegram
+# 2. Busca @BotFather
+# 3. Envía: /newbot
+# 4. Sigue las instrucciones:
+#    - Nombre: "Taller Mecánico Bot"
+#    - Username: "taller_mecanico_bot" (debe terminar en bot)
+# 5. BotFather te dará un TOKEN
+# 6. Copia el token aquí
+# ============================================================
