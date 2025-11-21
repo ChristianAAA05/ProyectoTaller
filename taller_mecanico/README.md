@@ -88,11 +88,49 @@ DATABASES = {
 No requiere configuración adicional ni servicios externos.
 
 ## Migraciones y ejecución
+
+### 1. Aplicar migraciones
 ```bash
+cd taller_mecanico
 python manage.py migrate
+```
+
+### 2. Crear usuarios de prueba (Recomendado)
+
+Para poder iniciar sesión en el sistema, necesitas crear usuarios. Puedes hacerlo de dos formas:
+
+**Opción A: Usuarios de prueba automáticos** (Recomendado para desarrollo)
+```bash
+python manage.py setup_test_users
+```
+
+Esto creará automáticamente:
+- **Jefe**: `jefe` / `jefe123` (Acceso completo al sistema)
+- **Encargado**: `encargado` / `encargado123` (Gestión operacional)
+- **Mecánico**: `mecanico` / `mecanico123` (Vista de reparaciones)
+
+Si los usuarios ya existen y quieres recrearlos:
+```bash
+python manage.py setup_test_users --reset
+```
+
+**Opción B: Crear usuarios personalizados**
+```bash
+# Crear un jefe
+python manage.py crear_usuario jefe password123 --puesto jefe --nombre "Roberto" --email jefe@taller.com
+
+# Crear un mecánico
+python manage.py crear_usuario juan pass456 --puesto mecanico --nombre "Juan" --telefono "0981-123-456"
+```
+
+### 3. Ejecutar el servidor
+```bash
 python manage.py runserver
 ```
+
 - Accede a la app en http://127.0.0.1:8000/
+- Página de login: http://127.0.0.1:8000/login/
+- Panel admin de Django: http://127.0.0.1:8000/admin/
 - Endpoints API bajo el prefijo definido en `taller_mecanico/urls.py` (por defecto `api/`).
 
 ## Consideraciones adicionales
