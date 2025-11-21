@@ -37,16 +37,17 @@ urlpatterns = [
     # ========== URLS DE DASHBOARDS ==========
     # Página de inicio que redirige según el rol del usuario
     path('inicio/', views.inicio, name='inicio'),
-    
+
     # Dashboard para el jefe del taller
     path('dashboard-jefe/', views.dashboard_jefe, name='dashboard_jefe'),
-    
+
     # Dashboard para el encargado
     path('dashboard-encargado/', views.dashboard_encargado, name='dashboard_encargado'),
-    
+
     # Dashboard para el mecánico
     path('dashboard-mecanico/', views.dashboard_mecanico, name='dashboard_mecanico'),
-    
+    path('mecanico/reparacion/<int:reparacion_id>/', views.gestionar_reparacion_mecanico, name='gestionar_reparacion_mecanico'),
+
     # Gestión de tareas
     path('tareas/', views.listar_tareas, name='listar_tareas'),
     path('tareas/', views.listar_tareas, name='lista_tareas'),  # Alias para compatibilidad con templates
@@ -54,7 +55,7 @@ urlpatterns = [
     path('tareas/editar/<int:tarea_id>/', views.editar_tarea, name='editar_tarea'),
     path('tareas/eliminar/<int:tarea_id>/', views.eliminar_tarea, name='eliminar_tarea'),
     path('tareas/<int:tarea_id>/estado/<str:nuevo_estado>/', views.cambiar_estado_tarea, name='cambiar_estado_tarea'),
-    
+
     # Dashboard de reparaciones
     path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
     path('reparaciones/nueva/', views.crear_reparacion, name='crear_reparacion'),
@@ -64,7 +65,7 @@ urlpatterns = [
     # Reportes
     path('reportes/ingresos/', views.reportes_ingresos, name='reportes_ingresos'),
     path('reportes/ingresos/exportar/', views.exportar_ingresos_excel, name='exportar_ingresos_excel'),
-    
+
     # ========== URLS DE API REST ==========
     # URLs automáticas para operaciones CRUD usando Django REST Framework
     # Estas URLs siguen el patrón REST: GET, POST, PUT, DELETE
@@ -77,7 +78,7 @@ urlpatterns = [
     path('vehiculos/editar/<int:pk>/', views.vehiculo_editar, name='vehiculo-editar'),
     path('vehiculos/eliminar/<int:pk>/', views.vehiculo_eliminar, name='vehiculo-eliminar'),
     path('api/clientes/buscar/', views.buscar_clientes, name='buscar-clientes'),
-    
+
     # Clientes - operaciones CRUD automáticas
     path('clientes/', views.ClienteListCreate.as_view(), name='clientes-list-create'),        # GET (listar), POST (crear)
     path('clientes/<int:pk>/', views.ClienteRetrieveUpdateDestroy.as_view(), name='cliente-detail'),  # GET, PUT, DELETE por ID
@@ -123,11 +124,14 @@ urlpatterns = [
     path('servicios/eliminar/<int:pk>/', views.servicios_eliminar, name='servicios-eliminar'),  # Confirmación para eliminar servicio
 
     # ========== GESTIÓN DE CITAS ==========
-    # Comentado temporalmente hasta que se implementen las vistas de citas
-    # path('citas/', views.citas_lista, name='citas-lista'),
-    # path('citas/crear/', views.cita_crear, name='cita-crear'),
-    # path('citas/editar/<int:pk>/', views.cita_editar, name='cita-editar'),
-    # path('citas/eliminar/<int:pk>/', views.cita_eliminar, name='cita-eliminar'),
+    # IMPORTANTE: Estas URLs son requeridas por dashboard_encargado.html y dashboard_jefe.html
+    # Temporalmente redirigen a not_implemented_view hasta que se implementen
+    path('citas/', views.not_implemented_view, name='lista_citas'),
+    path('citas/agregar/', views.not_implemented_view, name='agregar_cita'),
+    path('citas/crear/', views.not_implemented_view, name='crear_cita'),  # Alias for agregar_cita
+    path('citas/<int:pk>/', views.not_implemented_view, name='detalle_cita'),
+    path('citas/editar/<int:pk>/', views.not_implemented_view, name='editar_cita'),
+    path('citas/eliminar/<int:pk>/', views.not_implemented_view, name='eliminar_cita'),
 
     # ========== GESTIÓN DE INVENTARIO ==========
     # Comentado temporalmente hasta que se implementen las vistas de inventario
@@ -162,7 +166,7 @@ urlpatterns = [
     # Comentado temporalmente hasta que se implementen las vistas
     # path('acerca-de/', views.acerca_de, name='acerca-de'),
     # path('contacto/', views.contacto, name='contacto'),
-    
+
     # ========== GESTIÓN DE CITAS ==========
     # Comentado temporalmente hasta que se implementen las vistas de citas
     # path('citas/', views.lista_citas, name='lista_citas'),

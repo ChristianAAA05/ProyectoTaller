@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ titulo }} - Taller Mecánico{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-card {
+        border-left: 4px solid #0d6efd;
+    }
+    .section-title {
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .data-label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    .data-value {
+        font-size: 1rem;
+        color: #212529;
+    }
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-1 fw-bold text-primary">
+                        <i class="fas fa-tools me-2"></i>{{ titulo }}
+                    </h1>
+                    <p class="text-muted mb-0">
+                        <span class="badge 
+                            {% if reparacion.estado_reparacion == 'en_progreso' %}bg-primary
+                            {% elif reparacion.estado_reparacion == 'pendiente' %}bg-secondary
+                            {% elif reparacion.estado_reparacion == 'en_espera' %}bg-warning
+                            {% elif reparacion.estado_reparacion == 'completada' %}bg-success
+                            {% else %}bg-info{% endif %}">
+                            {{ reparacion.get_estado_reparacion_display }}
+                        </span>
+                        <span class="ms-2">•</span>
+                        <span class="ms-2">Ingresó: {{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}</span>
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'dashboard_mecanico' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Volver al Dashboard
+                    </a>
+                </div>
+            </div>
+            <hr class="mt-3">
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="row mb-3">
+        <div class="col-12">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Columna Izquierda: Información del Cliente y Vehículo -->
+            <div class="col-lg-4 mb-4">
+                <!-- Datos del Cliente -->
+                <div class="card border-0 shadow-sm mb-4 info-card">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0 text-primary">
+                            <i class="fas fa-user me-2"></i>Datos del Cliente
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Nombre Completo</p>
+                            <p class="data-value mb-0">{{ cliente.nombre_completo }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Teléfono</p>
+                            <p class="data-value mb-0">
+                                <i class="fas fa-phone me-1 text-success"></i>
+                                <a href="tel:{{ cliente.telefono }}" class="text-decoration-none">{{ cliente.telefono }}</a>
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Email</p>
+                            <p class="data-value mb-0">
+                                <i class="fas fa-envelope me-1 text-primary"></i>
+                                <a href="mailto:{{ cliente.correo_electronico }}" class="text-decoration-none">{{ cliente.correo_electronico }}</a>
+                            </p>
+                        </div>
+                        {% if cliente.direccion %}
+                        <div class="mb-0">
+                            <p class="data-label mb-1">Dirección</p>
+                            <p class="data-value mb-0">
+                                <i class="fas fa-map-marker-alt me-1 text-danger"></i>
+                                {{ cliente.direccion }}
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Datos del Vehículo -->
+                <div class="card border-0 shadow-sm info-card">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0 text-primary">
+                            <i class="fas fa-car me-2"></i>Datos del Vehículo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Vehículo</p>
+                            <p class="data-value mb-0">{{ vehiculo.marca }} {{ vehiculo.modelo }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Año</p>
+                            <p class="data-value mb-0">{{ vehiculo.año }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <p class="data-label mb-1">Placa / Patente</p>
+                            <p class="data-value mb-0">
+                                <span class="badge bg-dark fs-6">{{ vehiculo.placa }}</span>
+                            </p>
+                        </div>
+                        <div class="mb-0">
+                            <p class="data-label mb-1">Servicio Solicitado</p>
+                            <p class="data-value mb-0">
+                                <i class="fas fa-tools me-1 text-primary"></i>
+                                {{ reparacion.servicio.nombre_servicio }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Formularios de Datos y Diagnóstico -->
+            <div class="col-lg-8">
+                <!-- Datos Adicionales del Vehículo -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>Datos Adicionales del Vehículo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="kilometraje" class="form-label">Kilometraje Actual</label>
+                                <div class="input-group">
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="kilometraje" 
+                                           name="kilometraje" 
+                                           value="{{ kilometraje_actual }}"
+                                           placeholder="Ej: 150000">
+                                    <span class="input-group-text">km</span>
+                                </div>
+                                <small class="text-muted">Registrar el kilometraje del vehículo al ingresar</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="nivel_combustible" class="form-label">Nivel de Combustible</label>
+                                <select class="form-select" id="nivel_combustible" name="nivel_combustible">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Vacío" {% if nivel_combustible_actual == "Vacío" %}selected{% endif %}>🔴 Vacío (0-10%)</option>
+                                    <option value="1/4" {% if nivel_combustible_actual == "1/4" %}selected{% endif %}>🟠 1/4 (10-25%)</option>
+                                    <option value="1/2" {% if nivel_combustible_actual == "1/2" %}selected{% endif %}>🟡 1/2 (25-50%)</option>
+                                    <option value="3/4" {% if nivel_combustible_actual == "3/4" %}selected{% endif %}>🟢 3/4 (50-75%)</option>
+                                    <option value="Lleno" {% if nivel_combustible_actual == "Lleno" %}selected{% endif %}>🟢 Lleno (75-100%)</option>
+                                </select>
+                                <small class="text-muted">Nivel de combustible al momento del ingreso</small>
+                            </div>
+
+                            <div class="col-12 mb-3">
+                                <label for="condicion_vehiculo" class="form-label">Condición General del Vehículo</label>
+                                <select class="form-select" id="condicion_vehiculo" name="condicion_vehiculo" required>
+                                    {% for value, label in condicion_opciones %}
+                                    <option value="{{ value }}" {% if reparacion.condicion_vehiculo == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="observaciones_vehiculo" class="form-label">Observaciones del Vehículo</label>
+                                <textarea class="form-control" 
+                                          id="observaciones_vehiculo" 
+                                          name="observaciones_vehiculo" 
+                                          rows="3" 
+                                          placeholder="Ej: Rayones en puerta lateral, llanta de refacción desinflada, falta limpia parabrisas, etc.">{{ observaciones_actual }}</textarea>
+                                <small class="text-muted">Registrar daños preexistentes, faltantes o condiciones especiales</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informe de Reparación -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-medical me-2"></i>Informe de Reparación
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="informe" class="form-label">Diagnóstico y Trabajos Realizados</label>
+                            <textarea class="form-control" 
+                                      id="informe" 
+                                      name="informe" 
+                                      rows="8" 
+                                      placeholder="Describe el diagnóstico del problema, los trabajos realizados, repuestos utilizados y cualquier recomendación para el cliente..."></textarea>
+                            <small class="text-muted">Este informe se guardará en el historial de la reparación</small>
+                        </div>
+
+                        {% if reparacion.notas %}
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-history me-2"></i>Historial de Notas
+                            </h6>
+                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.9rem;">{{ reparacion.notas }}</pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Estado de la Reparación -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>Estado de la Reparación
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="estado_reparacion" class="form-label">Estado Actual</label>
+                                <select class="form-select" id="estado_reparacion" name="estado_reparacion" required>
+                                    {% for value, label in estado_opciones %}
+                                    <option value="{{ value }}" {% if reparacion.estado_reparacion == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Mecánico Asignado</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       value="{{ reparacion.mecanico_asignado.nombre|default:'Sin asignar' }}" 
+                                       readonly>
+                            </div>
+
+                            {% if reparacion.fecha_salida %}
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de Finalización</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       value="{{ reparacion.fecha_salida|date:'d/m/Y H:i' }}" 
+                                       readonly>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Nota:</strong> Si cambias el estado a "Completada", se registrará automáticamente la fecha de finalización.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Guardar Cambios
+                            </button>
+                            <a href="{% url 'dashboard_mecanico' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-guardar draft cada 2 minutos (opcional)
+    const informe = document.getElementById('informe');
+    if (informe) {
+        informe.addEventListener('input', function() {
+            // Guardar en localStorage como backup
+            localStorage.setItem('informe_draft_{{ reparacion.id }}', this.value);
+        });
+
+        // Recuperar draft al cargar
+        const draft = localStorage.getItem('informe_draft_{{ reparacion.id }}');
+        if (draft && !informe.value) {
+            if (confirm('Se encontró un borrador guardado. ¿Deseas recuperarlo?')) {
+                informe.value = draft;
+            }
+        }
+    }
+
+    // Limpiar draft al guardar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            localStorage.removeItem('informe_draft_{{ reparacion.id }}');
+        });
+    }
+
+    // Confirmar antes de cambiar a completada
+    const estadoSelect = document.getElementById('estado_reparacion');
+    if (estadoSelect) {
+        estadoSelect.addEventListener('change', function() {
+            if (this.value === 'completada') {
+                if (!confirm('¿Estás seguro de marcar esta reparación como completada? Se registrará la fecha de finalización.')) {
+                    this.value = '{{ reparacion.estado_reparacion }}';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

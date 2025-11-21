@@ -1,0 +1,48 @@
+===============================================================================
+COMANDOS GIT PARA EL COMMIT
+===============================================================================
+
+# 1. Ver el estado actual
+git status
+
+# 2. Agregar los archivos modificados
+git add taller_mecanico/gestion/views.py
+git add taller_mecanico/gestion/urls.py
+git add taller_mecanico/templates/gestion/dashboard_mecanico.html
+git add taller_mecanico/templates/gestion/gestionar_reparacion_mecanico.html
+git add taller_mecanico/templates/gestion/tareas/base_tareas.html
+git add taller_mecanico/templates/gestion/tareas/editar_tarea.html
+git add taller_mecanico/templates/gestion/tareas/crear_tarea.html
+
+# 3. Hacer el commit con el mensaje
+git commit -m "feat: Mejora completa del dashboard del mecánico con gestión de reparaciones
+
+- Mejorado dashboard_mecanico con estadísticas del mes y métricas de rendimiento
+- Agregada nueva vista gestionar_reparacion_mecanico para gestión completa
+- Creado template con datos del cliente, vehículo, formularios e informes
+- Implementado auto-asignación de reparaciones al mecánico
+- Agregado historial de notas con timestamps automáticos
+- Tarjetas clickeables y botón Gestionar para mejor UX
+- Auto-guardado de borradores en localStorage
+- Corregidos errores NoReverseMatch (lista_tareas → listar_tareas)
+- Corregido campo patente → placa en templates"
+
+# 4. Push al repositorio (si aplica)
+git push origin main
+
+===============================================================================
+
+ALTERNATIVA: Agregar todos los archivos de una vez
+---------------------------------------------------
+
+git add taller_mecanico/gestion/views.py \
+        taller_mecanico/gestion/urls.py \
+        taller_mecanico/templates/gestion/dashboard_mecanico.html \
+        taller_mecanico/templates/gestion/gestionar_reparacion_mecanico.html \
+        taller_mecanico/templates/gestion/tareas/*.html
+
+git commit -F MENSAJE_COMMIT.txt
+
+git push origin main
+
+===============================================================================

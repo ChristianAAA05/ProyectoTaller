@@ -1,0 +1,133 @@
+===============================================================================
+RESUMEN DE CAMBIOS - MEJORA DEL DASHBOARD DEL MECÁNICO
+===============================================================================
+Fecha: 21/11/2025
+Objetivo: Mejorar el dashboard del mecánico y agregar funcionalidad de 
+          gestión de reparaciones
+===============================================================================
+
+ARCHIVOS MODIFICADOS:
+--------------------
+
+1. gestion/views.py
+   - Mejorada vista dashboard_mecanico():
+     * Agregadas estadísticas del mes (reparaciones completadas, tareas)
+     * Cálculo de tiempo promedio de reparación
+     * Identificación de tareas urgentes (≤2 días)
+     * Mejor organización de contexto enviado al template
+   
+   - Nueva vista gestionar_reparacion_mecanico():
+     * Permite al mecánico gestionar reparaciones específicas
+     * Auto-asignación de mecánico al tomar una reparación
+     * Formulario para datos adicionales del vehículo (kilometraje, combustible)
+     * Sistema de informes de reparación con historial
+     * Actualización de condición y estado de la reparación
+     * Registro automático de fecha de salida al completar
+
+2. gestion/urls.py
+   - Agregada nueva URL:
+     path('mecanico/reparacion/<int:reparacion_id>/', 
+          views.gestionar_reparacion_mecanico, 
+          name='gestionar_reparacion_mecanico')
+
+3. templates/gestion/dashboard_mecanico.html
+   - Template completamente rediseñado:
+     * 4 tarjetas de estadísticas en la parte superior
+     * Panel de "Mis Reparaciones Activas" con indicadores de estado
+     * Panel de "Reparaciones Disponibles" para tomar nuevos trabajos
+     * Sección de tareas pendientes con indicador de urgencia
+     * Tareas completadas recientemente
+     * Tarjetas clickeables para acceso rápido
+     * Botón "Gestionar" en reparaciones activas
+     * Botón "Seleccionar" en reparaciones disponibles
+     * Auto-refresh cada 5 minutos
+     * Corrección: cambio de 'patente' a 'placa' (campo correcto del modelo)
+
+4. templates/gestion/tareas/base_tareas.html
+   - Corregida referencia de URL: 'lista_tareas' → 'listar_tareas'
+
+5. templates/gestion/tareas/editar_tarea.html
+   - Corregida referencia de URL: 'lista_tareas' → 'listar_tareas' (2 lugares)
+
+6. templates/gestion/tareas/crear_tarea.html
+   - Corregida referencia de URL: 'lista_tareas' → 'listar_tareas' (2 lugares)
+
+ARCHIVOS NUEVOS:
+---------------
+
+1. templates/gestion/gestionar_reparacion_mecanico.html
+   - Nuevo template para gestión completa de reparaciones:
+     * Sección de datos del cliente (nombre, teléfono, email, dirección)
+     * Sección de datos del vehículo (marca, modelo, año, placa, servicio)
+     * Formulario de datos adicionales del vehículo:
+       - Kilometraje actual
+       - Nivel de combustible (selector visual)
+       - Condición general del vehículo
+       - Observaciones (daños preexistentes, faltantes)
+     * Área de informe de reparación:
+       - Editor de texto para diagnóstico
+       - Historial completo de notas previas
+       - Auto-guardado en localStorage como borrador
+     * Control de estado de la reparación:
+       - Selector de estado
+       - Visualización de mecánico asignado
+       - Registro automático de fecha de finalización
+     * Confirmación antes de marcar como completada
+     * Responsive design con Bootstrap
+
+CARACTERÍSTICAS PRINCIPALES:
+----------------------------
+
+✅ Dashboard mejorado con estadísticas útiles para el mecánico
+✅ Vista completa de gestión de reparaciones
+✅ Auto-asignación de reparaciones al seleccionarlas
+✅ Sistema de informes con historial temporal
+✅ Tarjetas clickeables para mejor UX
+✅ Indicadores visuales de urgencia en tareas
+✅ Validación de permisos (solo mecánicos pueden acceder)
+✅ Auto-guardado de borradores (localStorage)
+✅ Corrección de errores de URLs (NoReverseMatch)
+
+BUGS CORREGIDOS:
+----------------
+
+❌ NoReverseMatch: 'lista_tareas' not found
+   ✅ Solucionado: Cambiado a 'listar_tareas' en todos los templates
+
+❌ Campo 'patente' no existe en modelo Vehiculo
+   ✅ Solucionado: Cambiado a 'placa' en dashboard_mecanico.html
+
+❌ No se podía volver a acceder a reparaciones ya tomadas
+   ✅ Solucionado: Agregado botón "Gestionar" y tarjetas clickeables
+
+MEJORAS UX:
+-----------
+
+🎨 Diseño moderno y limpio
+🎨 Tarjetas con efectos hover
+🎨 Badges con colores semánticos
+🎨 Iconos Font Awesome para mejor visualización
+🎨 Cursor pointer en elementos clickeables
+🎨 Mensajes de confirmación para acciones críticas
+🎨 Auto-refresh para mantener datos actualizados
+
+TECNOLOGÍAS UTILIZADAS:
+----------------------
+
+- Django 5.2.7
+- Bootstrap 5
+- Font Awesome 6.4.0
+- JavaScript vanilla (localStorage, event listeners)
+- Template tags de Django (humanize)
+
+NOTAS PARA EL COMMIT:
+--------------------
+
+Este conjunto de cambios mejora significativamente la experiencia del mecánico
+en el sistema, proporcionando herramientas completas para gestionar su trabajo
+diario, desde la asignación de reparaciones hasta la creación de informes
+detallados para los clientes.
+
+===============================================================================
+FIN DEL RESUMEN
+===============================================================================
