@@ -49,7 +49,11 @@ urlpatterns = [
     
     # Gestión de tareas
     path('tareas/', views.listar_tareas, name='listar_tareas'),
-    path('tareas/editar/<int:pk>/', views.editar_tarea, name='editar_tarea'),
+    path('tareas/', views.listar_tareas, name='lista_tareas'),  # Alias para compatibilidad con templates
+    path('tareas/crear/', views.crear_tarea, name='crear_tarea'),
+    path('tareas/editar/<int:tarea_id>/', views.editar_tarea, name='editar_tarea'),
+    path('tareas/eliminar/<int:tarea_id>/', views.eliminar_tarea, name='eliminar_tarea'),
+    path('tareas/<int:tarea_id>/estado/<str:nuevo_estado>/', views.cambiar_estado_tarea, name='cambiar_estado_tarea'),
     
     # Dashboard de reparaciones
     path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
@@ -111,6 +115,12 @@ urlpatterns = [
     path('empleados/crear/', views.empleados_crear, name='empleados-crear'),           # Formulario para crear empleado
     path('empleados/editar/<int:pk>/', views.empleados_editar, name='empleados-editar'),  # Formulario para editar empleado
     path('empleados/eliminar/<int:pk>/', views.empleados_eliminar, name='empleados-eliminar'),  # Confirmación para eliminar empleado
+
+    # ========== GESTIÓN DE SERVICIOS ==========
+    path('servicios/lista/', views.servicios_lista, name='servicios-lista'),          # Listar todos los servicios
+    path('servicios/crear/', views.servicios_crear, name='servicios-crear'),           # Formulario para crear servicio
+    path('servicios/editar/<int:pk>/', views.servicios_editar, name='servicios-editar'),  # Formulario para editar servicio
+    path('servicios/eliminar/<int:pk>/', views.servicios_eliminar, name='servicios-eliminar'),  # Confirmación para eliminar servicio
 
     # ========== GESTIÓN DE CITAS ==========
     # Comentado temporalmente hasta que se implementen las vistas de citas
