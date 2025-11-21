@@ -1,0 +1,22 @@
+feat: Mejora completa del dashboard del mecánico con gestión de reparaciones
+
+- Mejorado dashboard_mecanico con estadísticas del mes y métricas de rendimiento
+- Agregada nueva vista gestionar_reparacion_mecanico para gestión completa de reparaciones
+- Creado template con datos del cliente, vehículo, formularios e informes
+- Implementado sistema de auto-asignación de reparaciones al mecánico
+- Agregado historial de notas con timestamps automáticos
+- Tarjetas clickeables y botón "Gestionar" para mejor UX
+- Auto-guardado de borradores en localStorage
+- Corregidos errores NoReverseMatch (lista_tareas → listar_tareas)
+- Corregido campo 'patente' → 'placa' en templates
+
+Archivos modificados:
+- gestion/views.py
+- gestion/urls.py
+- templates/gestion/dashboard_mecanico.html
+- templates/gestion/tareas/base_tareas.html
+- templates/gestion/tareas/editar_tarea.html
+- templates/gestion/tareas/crear_tarea.html
+
+Archivos nuevos:
+- templates/gestion/gestionar_reparacion_mecanico.html

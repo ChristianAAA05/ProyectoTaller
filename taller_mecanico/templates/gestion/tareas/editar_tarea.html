@@ -3,7 +3,7 @@
 {% block titulo_pagina %}Editar Tarea: {{ tarea.titulo }}{% endblock %}
 
 {% block acciones_adicionales %}
-<a href="{% url 'lista_tareas' %}" class="btn btn-secondary btn-sm">
+<a href="{% url 'listar_tareas' %}" class="btn btn-secondary btn-sm">
     <i class="fas fa-arrow-left fa-sm"></i> Volver al listado
 </a>
 {% endblock %}
@@ -174,7 +174,7 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save mr-1"></i> Guardar Cambios
                         </button>
-                        <a href="{% url 'lista_tareas' %}" class="btn btn-secondary">
+                        <a href="{% url 'listar_tareas' %}" class="btn btn-secondary">
                             <i class="fas fa-times mr-1"></i> Cancelar
                         </a>
                         {% if request.user == tarea.creada_por or request.user.is_superuser %}

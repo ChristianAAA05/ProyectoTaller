@@ -46,10 +46,14 @@ urlpatterns = [
     
     # Dashboard para el mecánico
     path('dashboard-mecanico/', views.dashboard_mecanico, name='dashboard_mecanico'),
+    path('mecanico/reparacion/<int:reparacion_id>/', views.gestionar_reparacion_mecanico, name='gestionar_reparacion_mecanico'),
     
     # Gestión de tareas
     path('tareas/', views.listar_tareas, name='listar_tareas'),
-    path('tareas/editar/<int:pk>/', views.editar_tarea, name='editar_tarea'),
+    path('tareas/crear/', views.crear_tarea, name='crear_tarea'),
+    path('tareas/editar/<int:tarea_id>/', views.editar_tarea, name='editar_tarea'),
+    path('tareas/eliminar/<int:tarea_id>/', views.eliminar_tarea, name='eliminar_tarea'),
+    path('tareas/cambiar-estado/<int:tarea_id>/<str:nuevo_estado>/', views.cambiar_estado_tarea, name='cambiar_estado_tarea'),
     
     # Dashboard de reparaciones
     path('reparaciones/', views.dashboard_reparaciones, name='dashboard_reparaciones'),
@@ -112,12 +116,22 @@ urlpatterns = [
     path('empleados/editar/<int:pk>/', views.empleados_editar, name='empleados-editar'),  # Formulario para editar empleado
     path('empleados/eliminar/<int:pk>/', views.empleados_eliminar, name='empleados-eliminar'),  # Confirmación para eliminar empleado
 
+    # ========== GESTIÓN DE SERVICIOS ==========
+    # IMPORTANTE: No eliminar estas URLs - están referenciadas en base.html línea 107
+    path('servicios/lista/', views.servicios_lista, name='servicios-lista'),
+    path('servicios/crear/', views.servicios_crear, name='servicios-crear'),
+    path('servicios/editar/<int:pk>/', views.servicios_editar, name='servicios-editar'),
+    path('servicios/eliminar/<int:pk>/', views.servicios_eliminar, name='servicios-eliminar'),
+
     # ========== GESTIÓN DE CITAS ==========
-    # Comentado temporalmente hasta que se implementen las vistas de citas
-    # path('citas/', views.citas_lista, name='citas-lista'),
-    # path('citas/crear/', views.cita_crear, name='cita-crear'),
-    # path('citas/editar/<int:pk>/', views.cita_editar, name='cita-editar'),
-    # path('citas/eliminar/<int:pk>/', views.cita_eliminar, name='cita-eliminar'),
+    # IMPORTANTE: Estas URLs son requeridas por dashboard_encargado.html y dashboard_jefe.html
+    # Temporalmente redirigen a not_implemented_view hasta que se implementen
+    path('citas/', views.not_implemented_view, name='lista_citas'),
+    path('citas/agregar/', views.not_implemented_view, name='agregar_cita'),
+    path('citas/crear/', views.not_implemented_view, name='crear_cita'),  # Alias for agregar_cita
+    path('citas/<int:pk>/', views.not_implemented_view, name='detalle_cita'),
+    path('citas/editar/<int:pk>/', views.not_implemented_view, name='editar_cita'),
+    path('citas/eliminar/<int:pk>/', views.not_implemented_view, name='eliminar_cita'),
 
     # ========== GESTIÓN DE INVENTARIO ==========
     # Comentado temporalmente hasta que se implementen las vistas de inventario

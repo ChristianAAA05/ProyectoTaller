@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate, login, logout
 from .models import (
     Cliente, Vehiculo, Servicio, Empleado, Reparacion, Tarea, 
     TareaHistorial  # Solo importar modelos definidos
@@ -341,56 +341,217 @@ def dashboard_mecanico(request):
     
     # Obtener fecha actual
     hoy = timezone.now().date()
-    
-    # Obtener tareas asignadas al mecánico
-    tareas_asignadas = Tarea.objects.filter(
-        asignada_a=request.user,
-        estado__in=['por_hacer', 'en_progreso']
-    ).order_by('fecha_limite')
+    mes_actual = timezone.now().month
+    año_actual = timezone.now().year
     
     # Obtener el perfil de empleado del usuario actual
     empleado = None
     if hasattr(request.user, 'profile') and hasattr(request.user.profile, 'empleado_relacionado'):
         empleado = request.user.profile.empleado_relacionado
     
-    # Inicializar querysets vacíos
+    # Inicializar variables
     reparaciones_asignadas = Reparacion.objects.none()
     reparaciones_disponibles = Reparacion.objects.none()
+    reparaciones_completadas_mes = 0
+    reparaciones_en_progreso = 0
+    tiempo_promedio_reparacion = None
     
     if empleado:
-        # Reparaciones ya asignadas al mecánico
+        # Reparaciones asignadas activas
         reparaciones_asignadas = Reparacion.objects.filter(
             mecanico_asignado=empleado,
-            estado_reparacion__in=['en_progreso', 'pendiente']
-        ).select_related('vehiculo__cliente').order_by('fecha_ingreso')
+            estado_reparacion__in=['en_progreso', 'pendiente', 'en_espera']
+        ).select_related('vehiculo__cliente', 'servicio').order_by('fecha_ingreso')
         
-        # Reparaciones disponibles para que el mecánico las tome
+        # Reparaciones disponibles para tomar
         reparaciones_disponibles = Reparacion.objects.filter(
             estado_reparacion='pendiente',
-            mecanico_asignado__isnull=True  # Solo reparaciones sin asignar
-        ).select_related('vehiculo__cliente').order_by('fecha_ingreso')
+            mecanico_asignado__isnull=True
+        ).select_related('vehiculo__cliente', 'servicio').order_by('fecha_ingreso')[:10]
+        
+        # Estadísticas del mes
+        reparaciones_completadas_mes = Reparacion.objects.filter(
+            mecanico_asignado=empleado,
+            estado_reparacion='completada',
+            fecha_salida__month=mes_actual,
+            fecha_salida__year=año_actual
+        ).count()
+        
+        reparaciones_en_progreso = reparaciones_asignadas.filter(
+            estado_reparacion='en_progreso'
+        ).count()
+        
+        # Calcular tiempo promedio de reparación (últimas completadas)
+        completadas = Reparacion.objects.filter(
+            mecanico_asignado=empleado,
+            estado_reparacion='completada',
+            fecha_salida__isnull=False
+        ).order_by('-fecha_salida')[:10]
+        
+        if completadas.exists():
+            duraciones = [(r.fecha_salida - r.fecha_ingreso).days for r in completadas if r.fecha_salida]
+            if duraciones:
+                avg_days = sum(duraciones) / len(duraciones)
+                tiempo_promedio_reparacion = round(avg_days, 1)
     
-    # Obtener próximas citas asignadas (hoy y mañana)
-    manana = hoy + timezone.timedelta(days=1)
-    citas_proximas = []
+    # Tareas asignadas pendientes
+    tareas_asignadas = Tarea.objects.filter(
+        asignada_a=request.user,
+        estado__in=['por_hacer', 'en_progreso']
+    ).order_by('fecha_limite')
     
-    # Obtener tareas recientemente completadas (últimas 5)
+    tareas_urgentes = tareas_asignadas.filter(
+        fecha_limite__lte=hoy + timezone.timedelta(days=2)
+    ).count()
+    
+    # Tareas completadas este mes
+    tareas_completadas_mes = Tarea.objects.filter(
+        asignada_a=request.user,
+        estado='completada',
+        fecha_actualizacion__month=mes_actual,
+        fecha_actualizacion__year=año_actual
+    ).count()
+    
+    # Tareas recientemente completadas
     tareas_completadas = Tarea.objects.filter(
         asignada_a=request.user,
         estado='completada'
-    ).order_by('-fecha_creacion')[:5]
+    ).order_by('-fecha_actualizacion')[:5]
+    
+    # Próximas citas (placeholder - cuando se implemente el modelo Agenda)
+    citas_proximas = []
     
     context = {
-        'tareas_asignadas': tareas_asignadas,
+        'titulo': 'Panel del Mecánico',
+        'empleado': empleado,
+        'hoy': hoy,
+        
+        # Reparaciones
         'reparaciones_asignadas': reparaciones_asignadas,
         'reparaciones_disponibles': reparaciones_disponibles,
-        'citas_proximas': citas_proximas,
+        'reparaciones_completadas_mes': reparaciones_completadas_mes,
+        'reparaciones_en_progreso': reparaciones_en_progreso,
+        'tiempo_promedio_reparacion': tiempo_promedio_reparacion,
+        
+        # Tareas
+        'tareas_asignadas': tareas_asignadas,
+        'tareas_urgentes': tareas_urgentes,
         'tareas_completadas': tareas_completadas,
-        'hoy': hoy,
-        'empleado': empleado,
+        'tareas_completadas_mes': tareas_completadas_mes,
+        
+        # Citas
+        'citas_proximas': citas_proximas,
     }
     
     return render(request, 'gestion/dashboard_mecanico.html', context)
+
+
+@login_required
+def gestionar_reparacion_mecanico(request, reparacion_id):
+    """
+    Vista para que el mecánico gestione una reparación específica.
+    Muestra datos del cliente, permite actualizar datos del vehículo y crear informes.
+    """
+    # Verificar permisos
+    if not es_mecanico(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    # Obtener la reparación
+    reparacion = get_object_or_404(Reparacion, id=reparacion_id)
+    
+    # Obtener el empleado del usuario actual
+    empleado = None
+    if hasattr(request.user, 'profile') and hasattr(request.user.profile, 'empleado_relacionado'):
+        empleado = request.user.profile.empleado_relacionado
+    
+    # Si el mecánico está tomando la reparación (no tiene mecánico asignado aún)
+    if not reparacion.mecanico_asignado and empleado:
+        reparacion.mecanico_asignado = empleado
+        if reparacion.estado_reparacion == 'pendiente':
+            reparacion.estado_reparacion = 'en_progreso'
+        reparacion.save()
+        messages.success(request, f'Has tomado la reparación #{reparacion.id}')
+    
+    # Verificar que el mecánico asignado sea el usuario actual (o sea admin)
+    if reparacion.mecanico_asignado != empleado and not request.user.is_superuser:
+        messages.error(request, 'Esta reparación está asignada a otro mecánico.')
+        return redirect('dashboard_mecanico')
+    
+    # Procesar formulario de actualización
+    if request.method == 'POST':
+        # Actualizar datos del vehículo extra
+        kilometraje = request.POST.get('kilometraje', '').strip()
+        nivel_combustible = request.POST.get('nivel_combustible', '').strip()
+        observaciones_vehiculo = request.POST.get('observaciones_vehiculo', '').strip()
+        
+        # Actualizar condición y estado de reparación
+        condicion_vehiculo = request.POST.get('condicion_vehiculo', reparacion.condicion_vehiculo)
+        estado_reparacion = request.POST.get('estado_reparacion', reparacion.estado_reparacion)
+        
+        # Actualizar informe de reparación
+        informe = request.POST.get('informe', '').strip()
+        
+        # Construir las notas completas
+        notas_completas = []
+        if kilometraje:
+            notas_completas.append(f"Kilometraje: {kilometraje} km")
+        if nivel_combustible:
+            notas_completas.append(f"Nivel de combustible: {nivel_combustible}")
+        if observaciones_vehiculo:
+            notas_completas.append(f"Observaciones del vehículo: {observaciones_vehiculo}")
+        if informe:
+            notas_completas.append(f"\n--- INFORME DE REPARACIÓN ---\n{informe}")
+        
+        # Actualizar la reparación
+        reparacion.condicion_vehiculo = condicion_vehiculo
+        reparacion.estado_reparacion = estado_reparacion
+        
+        # Combinar notas antiguas con nuevas si existen
+        if notas_completas:
+            nuevas_notas = "\n".join(notas_completas)
+            if reparacion.notas:
+                reparacion.notas += f"\n\n--- Actualización {timezone.now().strftime('%d/%m/%Y %H:%M')} ---\n{nuevas_notas}"
+            else:
+                reparacion.notas = nuevas_notas
+        
+        # Si se completa la reparación, establecer fecha de salida
+        if estado_reparacion == 'completada' and not reparacion.fecha_salida:
+            reparacion.fecha_salida = timezone.now()
+        
+        reparacion.save()
+        messages.success(request, 'Reparación actualizada correctamente.')
+        return redirect('gestionar_reparacion_mecanico', reparacion_id=reparacion.id)
+    
+    # Extraer información de las notas si existen
+    kilometraje_actual = ''
+    nivel_combustible_actual = ''
+    observaciones_actual = ''
+    
+    if reparacion.notas:
+        # Intentar extraer info de las notas
+        for linea in reparacion.notas.split('\n'):
+            if 'Kilometraje:' in linea:
+                kilometraje_actual = linea.split('Kilometraje:')[1].strip().replace(' km', '')
+            elif 'Nivel de combustible:' in linea:
+                nivel_combustible_actual = linea.split('Nivel de combustible:')[1].strip()
+            elif 'Observaciones del vehículo:' in linea:
+                observaciones_actual = linea.split('Observaciones del vehículo:')[1].strip()
+    
+    context = {
+        'titulo': f'Gestionar Reparación #{reparacion.id}',
+        'reparacion': reparacion,
+        'cliente': reparacion.vehiculo.cliente,
+        'vehiculo': reparacion.vehiculo,
+        'empleado': empleado,
+        'kilometraje_actual': kilometraje_actual,
+        'nivel_combustible_actual': nivel_combustible_actual,
+        'observaciones_actual': observaciones_actual,
+        'condicion_opciones': Reparacion.CONDICION_OPCIONES,
+        'estado_opciones': Reparacion.ESTADO_REPARACION,
+    }
+    
+    return render(request, 'gestion/gestionar_reparacion_mecanico.html', context)
 
 
 @login_required
@@ -432,7 +593,8 @@ def dashboard_jefe(request):
         estado_reparacion__in=['pendiente', 'en_progreso', 'en_espera', 'revision']
     ).count()
     reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
-    citas_hoy_count = Agenda.objects.filter(fecha=hoy).count()
+    # citas_hoy_count = Agenda.objects.filter(fecha=hoy).count()  # Agenda model not implemented yet
+    citas_hoy_count = 0  # Placeholder until Agenda model is implemented
     clientes_nuevos_este_mes = Cliente.objects.filter(
         fecha_registro__year=hoy.year,
         fecha_registro__month=hoy.month
@@ -490,22 +652,24 @@ def dashboard_jefe(request):
 
     # Listas para secciones
     reparaciones_recientes = Reparacion.objects.select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:10]
-    citas_proximas = Agenda.objects.select_related('cliente', 'servicio').filter(fecha__gte=hoy).order_by('fecha', 'hora')[:10]
+    # citas_proximas = Agenda.objects.select_related('cliente', 'servicio').filter(fecha__gte=hoy).order_by('fecha', 'hora')[:10]
+    citas_proximas = []  # Placeholder until Agenda model is implemented
 
     # Empleados destacados por registros (últimos 30 días)
-    top_registros = (Registro.objects
-                     .filter(fecha__gte=desde)
-                     .values('empleado__id', 'empleado__nombre', 'empleado__puesto')
-                     .annotate(num_reparaciones=Count('id'))
-                     .order_by('-num_reparaciones')[:4])
-    empleados_destacados = [
-        {
-            'nombre': r['empleado__nombre'],
-            'puesto': r['empleado__puesto'],
-            'num_reparaciones': r['num_reparaciones'],
-        }
-        for r in top_registros
-    ]
+    # top_registros = (Registro.objects
+    #                  .filter(fecha__gte=desde)
+    #                  .values('empleado__id', 'empleado__nombre', 'empleado__puesto')
+    #                  .annotate(num_reparaciones=Count('id'))
+    #                  .order_by('-num_reparaciones')[:4])
+    # empleados_destacados = [
+    #     {
+    #         'nombre': r['empleado__nombre'],
+    #         'puesto': r['empleado__puesto'],
+    #         'num_reparaciones': r['num_reparaciones'],
+    #     }
+    #     for r in top_registros
+    # ]
+    empleados_destacados = []  # Placeholder until Registro model is implemented
 
     context = {
         'titulo': 'Panel del Jefe',
