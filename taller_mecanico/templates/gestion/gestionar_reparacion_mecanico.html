@@ -167,6 +167,21 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label for="vin_vehiculo" class="form-label">
+                                    <i class="fas fa-barcode me-1"></i>VIN (Número de Identificación)
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="vin_vehiculo" 
+                                       name="vin_vehiculo"
+                                       value="{{ vehiculo.vin|default:'' }}"
+                                       maxlength="17"
+                                       placeholder="Ingrese el VIN (17 caracteres)"
+                                       style="text-transform: uppercase;">
+                                <small class="text-muted">Código único de 17 caracteres del vehículo</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
                                 <label for="kilometraje" class="form-label">Kilometraje Actual</label>
                                 <div class="input-group">
                                     <input type="number" 
@@ -314,6 +329,14 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Convertir VIN a mayúsculas automáticamente
+    const vinInput = document.getElementById('vin_vehiculo');
+    if (vinInput) {
+        vinInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    }
+    
     // Auto-guardar draft cada 2 minutos (opcional)
     const informe = document.getElementById('informe');
     if (informe) {

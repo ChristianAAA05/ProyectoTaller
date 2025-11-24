@@ -165,7 +165,23 @@
                             </div>
                         </div>
 
-                        <!-- Se han eliminado los campos no existentes en el modelo -->
+                        <!-- Campo VIN (Número de Identificación del Vehículo) -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="{{ form.vin.id_for_label }}" class="form-label">
+                                    {{ form.vin.label }}
+                                    {% if not form.vin.field.required %}<span class="text-muted">(Opcional)</span>{% endif %}
+                                </label>
+                                {{ form.vin }}
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    El VIN es un código único de 17 caracteres que identifica al vehículo
+                                </small>
+                                <div class="invalid-feedback">
+                                    {{ form.vin.errors|join:", " }}
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="{% url 'vehiculos-lista' %}" class="btn btn-secondary me-md-2">

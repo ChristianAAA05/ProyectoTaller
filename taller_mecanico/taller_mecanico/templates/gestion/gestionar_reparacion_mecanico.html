@@ -1,0 +1,357 @@
+{% extends 'gestion/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }} - Taller Mecánico{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-card {
+        border-left: 4px solid #0d6efd;
+        margin-bottom: 1rem;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+    }
+    .info-value {
+        font-size: 1rem;
+        color: #212529;
+    }
+    .section-header {
+        background-color: #f8f9fa;
+        padding: 0.75rem 1rem;
+        border-left: 4px solid #0d6efd;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    .badge-custom {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    .timeline-item {
+        border-left: 2px solid #dee2e6;
+        padding-left: 1rem;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="fas fa-wrench me-2"></i>{{ titulo }}
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{% url 'dashboard_mecanico' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información del Cliente y Vehículo -->
+        <div class="col-lg-4">
+            <!-- Información del Cliente -->
+            <div class="card info-card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-user me-2"></i>Información del Cliente
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="info-label">Nombre Completo</div>
+                        <div class="info-value">{{ cliente.nombre }} {{ cliente.apellido }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Cédula</div>
+                        <div class="info-value">{{ cliente.cedula }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Teléfono</div>
+                        <div class="info-value">
+                            <i class="fas fa-phone me-1"></i>{{ cliente.telefono }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">
+                            <i class="fas fa-envelope me-1"></i>{{ cliente.correo_electronico|default:"-" }}
+                        </div>
+                    </div>
+                    {% if cliente.direccion %}
+                    <div class="mb-0">
+                        <div class="info-label">Dirección</div>
+                        <div class="info-value">{{ cliente.direccion }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Información del Vehículo -->
+            <div class="card info-card mb-3">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-car me-2"></i>Información del Vehículo
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="info-label">Marca y Modelo</div>
+                        <div class="info-value">{{ vehiculo.marca }} {{ vehiculo.modelo }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Año</div>
+                        <div class="info-value">{{ vehiculo.año }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Placa</div>
+                        <div class="info-value">
+                            <span class="badge bg-primary badge-custom">{{ vehiculo.placa }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <div class="info-label">VIN (Número de Identificación)</div>
+                        <div class="info-value">
+                            {% if vehiculo.vin %}
+                                <span class="badge bg-info text-dark badge-custom">
+                                    <i class="fas fa-barcode me-1"></i>{{ vehiculo.vin }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">No registrado</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de la Reparación -->
+            <div class="card info-card mb-3">
+                <div class="card-header bg-warning">
+                    <i class="fas fa-tools me-2"></i>Detalles de Reparación
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="info-label">Servicio</div>
+                        <div class="info-value">{{ reparacion.servicio.nombre_servicio }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Fecha de Ingreso</div>
+                        <div class="info-value">
+                            <i class="fas fa-calendar me-1"></i>{{ reparacion.fecha_ingreso|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                    {% if reparacion.fecha_salida %}
+                    <div class="mb-3">
+                        <div class="info-label">Fecha de Salida</div>
+                        <div class="info-value">
+                            <i class="fas fa-calendar-check me-1"></i>{{ reparacion.fecha_salida|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="mb-0">
+                        <div class="info-label">Costo del Servicio</div>
+                        <div class="info-value text-success fw-bold">
+                            ${{ reparacion.servicio.costo }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de Gestión -->
+        <div class="col-lg-8">
+            <form method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+
+                <!-- Datos Adicionales del Vehículo -->
+                <div class="card mb-3">
+                    <div class="section-header">
+                        <i class="fas fa-clipboard-list me-2"></i>Datos Adicionales del Vehículo
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="vin_vehiculo" class="form-label">
+                                    <i class="fas fa-barcode me-1"></i>VIN (Número de Identificación)
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="vin_vehiculo" 
+                                       name="vin_vehiculo"
+                                       value="{{ vehiculo.vin|default:'' }}"
+                                       maxlength="17"
+                                       placeholder="Ingrese el VIN (17 caracteres)"
+                                       style="text-transform: uppercase;">
+                                <small class="form-text text-muted">
+                                    Código único de 17 caracteres del vehículo
+                                </small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="kilometraje" class="form-label">
+                                    <i class="fas fa-tachometer-alt me-1"></i>Kilometraje
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="kilometraje" 
+                                       name="kilometraje"
+                                       value="{{ kilometraje_actual }}"
+                                       placeholder="Ej: 45000">
+                                <small class="form-text text-muted">Kilometraje actual del vehículo</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nivel_combustible" class="form-label">
+                                    <i class="fas fa-gas-pump me-1"></i>Nivel de Combustible
+                                </label>
+                                <select class="form-select" id="nivel_combustible" name="nivel_combustible">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Vacío" {% if nivel_combustible_actual == 'Vacío' %}selected{% endif %}>Vacío</option>
+                                    <option value="1/4" {% if nivel_combustible_actual == '1/4' %}selected{% endif %}>1/4</option>
+                                    <option value="1/2" {% if nivel_combustible_actual == '1/2' %}selected{% endif %}>1/2</option>
+                                    <option value="3/4" {% if nivel_combustible_actual == '3/4' %}selected{% endif %}>3/4</option>
+                                    <option value="Lleno" {% if nivel_combustible_actual == 'Lleno' %}selected{% endif %}>Lleno</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label for="observaciones_vehiculo" class="form-label">
+                                <i class="fas fa-eye me-1"></i>Observaciones del Vehículo
+                            </label>
+                            <textarea class="form-control" 
+                                      id="observaciones_vehiculo" 
+                                      name="observaciones_vehiculo" 
+                                      rows="3"
+                                      placeholder="Rayones, abolladuras, daños previos, etc.">{{ observaciones_actual }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado de la Reparación -->
+                <div class="card mb-3">
+                    <div class="section-header">
+                        <i class="fas fa-tasks me-2"></i>Estado de la Reparación
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="condicion_vehiculo" class="form-label">
+                                    Condición del Vehículo
+                                </label>
+                                <select class="form-select" id="condicion_vehiculo" name="condicion_vehiculo" required>
+                                    {% for value, label in condicion_opciones %}
+                                    <option value="{{ value }}" {% if reparacion.condicion_vehiculo == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="estado_reparacion" class="form-label">
+                                    Estado de Reparación
+                                </label>
+                                <select class="form-select" id="estado_reparacion" name="estado_reparacion" required>
+                                    {% for value, label in estado_opciones %}
+                                    <option value="{{ value }}" {% if reparacion.estado_reparacion == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informe de Reparación -->
+                <div class="card mb-3">
+                    <div class="section-header">
+                        <i class="fas fa-file-alt me-2"></i>Informe de Reparación
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="informe" class="form-label">Detalle del Trabajo Realizado</label>
+                            <textarea class="form-control" 
+                                      id="informe" 
+                                      name="informe" 
+                                      rows="6"
+                                      placeholder="Describa el trabajo realizado, piezas reemplazadas, diagnósticos, etc."></textarea>
+                        </div>
+
+                        {% if reparacion.notas %}
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-history me-2"></i>Historial de Notas
+                            </h6>
+                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.875rem;">{{ reparacion.notas }}</pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'dashboard_mecanico' %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Convertir VIN a mayúsculas automáticamente
+    $('#vin_vehiculo').on('input', function() {
+        $(this).val($(this).val().toUpperCase());
+    });
+
+    // Validación del formulario
+    (function() {
+        'use strict';
+        var forms = document.querySelectorAll('.needs-validation');
+        Array.prototype.slice.call(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+
+    // Confirmación antes de completar la reparación
+    $('#estado_reparacion').on('change', function() {
+        if ($(this).val() === 'completada') {
+            if (!confirm('¿Está seguro de marcar esta reparación como completada? Esto establecerá la fecha de salida.')) {
+                $(this).val('{{ reparacion.estado_reparacion }}');
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -132,11 +132,11 @@
                     {% for cita in citas_hoy|slice:":5" %}
                     <a href="{% url 'detalle_cita' cita.id %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }}</h6>
-                            <small>{{ cita.hora_inicio|time:"H:i" }}</small>
+                            <h6 class="mb-1">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</h6>
+                            <small>{{ cita.hora|time:"H:i" }}</small>
                         </div>
-                        <p class="mb-1">{{ cita.descripcion|truncatechars:60 }}</p>
-                        <small class="text-muted">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</small>
+                        <p class="mb-1">{{ cita.servicio.nombre_servicio }}</p>
+                        <small class="text-muted"><i class="fas fa-phone me-1"></i>{{ cita.cliente.telefono }}</small>
                     </a>
                     {% endfor %}
                 </div>

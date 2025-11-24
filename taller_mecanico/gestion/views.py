@@ -1,4 +1,4 @@
-from django.forms import formset_factory
+from django.forms import formset_factory, inlineformset_factory
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
@@ -13,6 +13,8 @@ from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from django.http import JsonResponse, HttpResponse, HttpResponseRedirect, Http404
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_http_methods, require_POST
+import json
+from io import BytesIO
 from rest_framework import generics, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,7 +23,7 @@ from rest_framework.authentication import SessionAuthentication
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from .models import (
     Cliente, Vehiculo, Servicio, Empleado, Reparacion, Tarea, 
-    TareaHistorial  # Solo importar modelos definidos
+    TareaHistorial, Agenda  # Solo importar modelos definidos
 )
 from .forms import (
     ClienteForm, VehiculoForm, ServicioForm, EmpleadoForm, 
@@ -100,7 +102,16 @@ def login_view(request):
         if user is not None:
             login(request, user)
             messages.success(request, 'Inicio de sesión exitoso.')
-            return redirect('inicio')
+            
+            # Redirigir según el rol del usuario
+            if es_jefe(user):
+                return redirect('dashboard_jefe')
+            elif es_encargado(user):
+                return redirect('dashboard_encargado')
+            elif es_mecanico(user):
+                return redirect('dashboard_mecanico')
+            else:
+                return redirect('inicio')
         messages.error(request, 'Usuario o contraseña incorrectos.')
     return render(request, 'auth/login.html')
 
@@ -257,7 +268,9 @@ def cambiar_estado_tarea(request, tarea_id, nuevo_estado):
 @login_required
 def inicio(request):
     # Redirigir según el rol del usuario
-    if es_jefe_o_encargado(request.user):
+    if es_jefe(request.user):
+        return redirect('dashboard_jefe')
+    elif es_encargado(request.user):
         return redirect('dashboard_encargado')
     elif es_mecanico(request.user):
         return redirect('dashboard_mecanico')
@@ -287,6 +300,120 @@ def not_implemented_view(request, *args, **kwargs):
     messages.info(request, 'Funcionalidad en desarrollo.')
     return redirect('inicio')
 
+
+# ========== GESTIÓN DE CITAS ==========
+
+@login_required
+def lista_citas(request):
+    """Vista para listar todas las citas"""
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    citas = Agenda.objects.all().select_related('cliente', 'servicio').order_by('-fecha', '-hora')
+    
+    context = {
+        'titulo': 'Lista de Citas',
+        'citas': citas,
+        'hoy': timezone.now().date(),
+    }
+    return render(request, 'gestion/citas/lista_citas.html', context)
+
+
+@login_required
+def agregar_cita(request):
+    """Vista para crear una nueva cita"""
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    if request.method == 'POST':
+        form = CitaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Cita creada exitosamente.')
+            return redirect('lista_citas')
+    else:
+        form = CitaForm()
+    
+    context = {
+        'titulo': 'Nueva Cita',
+        'form': form,
+        'hoy': timezone.now().date(),
+    }
+    return render(request, 'gestion/citas/crear_cita.html', context)
+
+
+# Alias para agregar_cita
+crear_cita = agregar_cita
+
+
+@login_required
+def detalle_cita(request, pk):
+    """Vista para ver los detalles de una cita"""
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    cita = get_object_or_404(Agenda, pk=pk)
+    
+    context = {
+        'titulo': 'Detalle de Cita',
+        'cita': cita,
+        'hoy': timezone.now().date(),
+    }
+    return render(request, 'gestion/citas/detalle_cita.html', context)
+
+
+@login_required
+def editar_cita(request, pk):
+    """Vista para editar una cita existente"""
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    cita = get_object_or_404(Agenda, pk=pk)
+    
+    if request.method == 'POST':
+        form = CitaForm(request.POST, instance=cita)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Cita actualizada exitosamente.')
+            return redirect('detalle_cita', pk=pk)
+    else:
+        form = CitaForm(instance=cita)
+    
+    context = {
+        'titulo': 'Editar Cita',
+        'form': form,
+        'cita': cita,
+        'hoy': timezone.now().date(),
+    }
+    return render(request, 'gestion/citas/editar_cita.html', context)
+
+
+@login_required
+def eliminar_cita(request, pk):
+    """Vista para eliminar una cita"""
+    if not es_jefe_o_encargado(request.user):
+        messages.error(request, 'No tienes permiso para acceder a esta sección.')
+        return redirect('inicio')
+    
+    cita = get_object_or_404(Agenda, pk=pk)
+    
+    if request.method == 'POST':
+        cita.delete()
+        messages.success(request, 'Cita eliminada exitosamente.')
+        return redirect('lista_citas')
+    
+    context = {
+        'titulo': 'Eliminar Cita',
+        'cita': cita,
+        'hoy': timezone.now().date(),
+    }
+    return render(request, 'gestion/citas/eliminar_cita.html', context)
+
+
 @login_required
 def dashboard_encargado(request):
     """
@@ -306,9 +433,14 @@ def dashboard_encargado(request):
         estado_reparacion='en_progreso'
     ).select_related('vehiculo', 'vehiculo__cliente', 'servicio').order_by('-fecha_ingreso')[:5]
     
-    # Inicializar variables para citas (comentadas temporalmente)
-    citas_hoy = []
-    proximas_citas = []
+    # Obtener citas de hoy
+    citas_hoy = Agenda.objects.filter(fecha=hoy).select_related('cliente', 'servicio').order_by('hora')
+    
+    # Obtener próximas citas (siguientes 7 días)
+    proximas_citas = Agenda.objects.filter(
+        fecha__gt=hoy,
+        fecha__lte=hoy + timedelta(days=7)
+    ).select_related('cliente', 'servicio').order_by('fecha', 'hora')[:5]
     
     # Obtener tareas para el dashboard
     tareas = Tarea.objects.all()
@@ -480,6 +612,17 @@ def gestionar_reparacion_mecanico(request, reparacion_id):
     
     # Procesar formulario de actualización
     if request.method == 'POST':
+        # Actualizar VIN del vehículo si se proporciona
+        vin_vehiculo = request.POST.get('vin_vehiculo', '').strip().upper()
+        vin_anterior = reparacion.vehiculo.vin
+        vin_actualizado = False
+        
+        if vin_vehiculo and vin_vehiculo != vin_anterior:
+            reparacion.vehiculo.vin = vin_vehiculo
+            reparacion.vehiculo.save()
+            vin_actualizado = True
+            messages.success(request, f'VIN del vehículo actualizado: {vin_vehiculo}')
+        
         # Actualizar datos del vehículo extra
         kilometraje = request.POST.get('kilometraje', '').strip()
         nivel_combustible = request.POST.get('nivel_combustible', '').strip()
@@ -494,6 +637,8 @@ def gestionar_reparacion_mecanico(request, reparacion_id):
         
         # Construir las notas completas
         notas_completas = []
+        if vin_actualizado:
+            notas_completas.append(f"VIN actualizado: {vin_vehiculo}")
         if kilometraje:
             notas_completas.append(f"Kilometraje: {kilometraje} km")
         if nivel_combustible:
@@ -593,8 +738,7 @@ def dashboard_jefe(request):
         estado_reparacion__in=['pendiente', 'en_progreso', 'en_espera', 'revision']
     ).count()
     reparaciones_completadas = Reparacion.objects.filter(estado_reparacion='completada').count()
-    # citas_hoy_count = Agenda.objects.filter(fecha=hoy).count()  # Agenda model not implemented yet
-    citas_hoy_count = 0  # Placeholder until Agenda model is implemented
+    citas_hoy_count = Agenda.objects.filter(fecha=hoy).count()
     clientes_nuevos_este_mes = Cliente.objects.filter(
         fecha_registro__year=hoy.year,
         fecha_registro__month=hoy.month
@@ -624,7 +768,7 @@ def dashboard_jefe(request):
         for item in rep_estados_qs
     ]
 
-    # Ingresos mensuales (suma de costo del servicio por mes) - últimos 6 meses
+    # Ingresos mensuales (suma de costo del servicio por mes) - últimos 12 meses
     ingresos_qs = (Reparacion.objects
                    .annotate(m=TruncMonth('fecha_ingreso'))
                    .values('m')
@@ -632,12 +776,20 @@ def dashboard_jefe(request):
                    .order_by('m'))
     ingresos_totales_agg = Reparacion.objects.aggregate(total=Sum('servicio__costo'))
     ingresos_totales = float(ingresos_totales_agg['total'] or 0)
-    meses_all = [item['m'].strftime('%b %Y') if item['m'] else '' for item in ingresos_qs]
-    ingresos_all = [float(item['total']) if item['total'] is not None else 0.0 for item in ingresos_qs]
-    meses = meses_all[-6:]
-    ingresos = ingresos_all[-6:]
+    
+    # Procesar datos de ingresos
+    meses_all = []
+    ingresos_all = []
+    for item in ingresos_qs:
+        if item['m'] and item['total']:
+            meses_all.append(item['m'].strftime('%b %Y'))
+            ingresos_all.append(float(item['total']))
+    
+    # Tomar últimos 12 meses o todos si hay menos
+    meses = meses_all[-12:] if len(meses_all) > 12 else meses_all
+    ingresos = ingresos_all[-12:] if len(ingresos_all) > 12 else ingresos_all
     total_ingresos_mensuales = sum(ingresos) if ingresos else 0.0
-    promedio_mensual = (total_ingresos_mensuales / len(ingresos)) if ingresos else None
+    promedio_mensual = (total_ingresos_mensuales / len(ingresos)) if ingresos else 0.0
 
     # Tiempo promedio de reparación (en días) para completadas
     completadas = Reparacion.objects.filter(fecha_salida__isnull=False)
@@ -652,8 +804,7 @@ def dashboard_jefe(request):
 
     # Listas para secciones
     reparaciones_recientes = Reparacion.objects.select_related('vehiculo', 'servicio').order_by('-fecha_ingreso')[:10]
-    # citas_proximas = Agenda.objects.select_related('cliente', 'servicio').filter(fecha__gte=hoy).order_by('fecha', 'hora')[:10]
-    citas_proximas = []  # Placeholder until Agenda model is implemented
+    citas_proximas = Agenda.objects.select_related('cliente', 'servicio').filter(fecha__gte=hoy).order_by('fecha', 'hora')[:10]
 
     # Empleados destacados por registros (últimos 30 días)
     # top_registros = (Registro.objects
@@ -685,8 +836,8 @@ def dashboard_jefe(request):
         'vehiculos_frecuentes': vehiculos_frecuentes,
         'reparaciones_por_estado': reparaciones_por_estado,
         'ingresos_mensuales': bool(ingresos),
-        'meses': meses,
-        'ingresos': ingresos,
+        'meses': json.dumps(meses),
+        'ingresos': json.dumps(ingresos),
         'ingresos_totales': ingresos_totales,
         'promedio_mensual': promedio_mensual,
         'total_ingresos_mensuales': total_ingresos_mensuales,
@@ -1163,7 +1314,7 @@ def clientes_lista(request):
 @login_required
 @transaction.atomic
 def clientes_crear(request):
-    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa'], extra=1, can_delete=True)
+    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa', 'vin'], extra=1, can_delete=True)
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         formset = VehiculoFormSet(request.POST, prefix='vehiculos')
@@ -1183,7 +1334,7 @@ def clientes_crear(request):
 @transaction.atomic
 def clientes_editar(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
-    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa'], extra=0, can_delete=True)
+    VehiculoFormSet = inlineformset_factory(Cliente, Vehiculo, fields=['marca', 'modelo', 'año', 'placa', 'vin'], extra=0, can_delete=True)
     if request.method == 'POST':
         form = ClienteForm(request.POST, instance=cliente)
         formset = VehiculoFormSet(request.POST, instance=cliente, prefix='vehiculos')

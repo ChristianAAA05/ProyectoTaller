@@ -37,6 +37,11 @@ class UserProfile(models.Model):
     avatar_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL de la imagen de avatar")
     es_empleado = models.BooleanField(default=False)
     empleado_relacionado = models.OneToOneField('Empleado', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Roles específicos del taller
+    es_jefe = models.BooleanField(default=False, help_text="Usuario con permisos de jefe")
+    es_encargado = models.BooleanField(default=False, help_text="Usuario con permisos de encargado")
+    es_mecanico = models.BooleanField(default=False, help_text="Usuario con permisos de mecánico")
 
     def __str__(self):
         return f"Perfil de {self.user.username}"
@@ -122,6 +127,7 @@ class Vehiculo(models.Model):
     modelo = models.CharField(max_length=50)
     año = models.IntegerField()
     placa = models.CharField(max_length=10, unique=True)  # Placa única del vehículo
+    vin = models.CharField(max_length=17, blank=True, null=True, verbose_name='VIN', help_text='Número de Identificación del Vehículo (17 caracteres)')
 
     def __str__(self):
         return f"{self.marca} {self.modelo} ({self.placa})"

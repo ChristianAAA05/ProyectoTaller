@@ -169,14 +169,15 @@ class VehiculoForm(forms.ModelForm):
     
     class Meta:
         model = Vehiculo
-        fields = ['cliente', 'marca', 'modelo', 'año', 'placa']
+        fields = ['cliente', 'marca', 'modelo', 'año', 'placa', 'vin']
 
         # Labels descriptivos para cada campo
         labels = {
             'marca': 'Marca del Vehículo',
             'modelo': 'Modelo del Vehículo',
             'año': 'Año del Vehículo',
-            'placa': 'Placa del Vehículo'
+            'placa': 'Placa del Vehículo',
+            'vin': 'VIN (Número de Identificación)'
         }
 
         # Widgets configurados para cada tipo de campo
@@ -203,6 +204,14 @@ class VehiculoForm(forms.ModelForm):
                 'placeholder': 'Ingrese la placa del vehículo',
                 'style': 'text-transform: uppercase;',
                 'required': 'required'
+            }),
+            'vin': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ingrese el VIN (17 caracteres)',
+                'maxlength': '17',
+                'style': 'text-transform: uppercase;',
+                'pattern': '[A-HJ-NPR-Z0-9]{17}',
+                'title': 'El VIN debe tener 17 caracteres alfanuméricos'
             }),
         }
 
@@ -385,6 +394,40 @@ class CitaForm(forms.ModelForm):
     Permite gestionar las citas de los clientes, incluyendo el servicio,
     fecha y hora de la cita.
     """
+    # Generar opciones de hora de 8:00 AM a 6:00 PM cada 30 minutos
+    HORAS_CHOICES = [
+        ('08:00', '08:00 AM'),
+        ('08:30', '08:30 AM'),
+        ('09:00', '09:00 AM'),
+        ('09:30', '09:30 AM'),
+        ('10:00', '10:00 AM'),
+        ('10:30', '10:30 AM'),
+        ('11:00', '11:00 AM'),
+        ('11:30', '11:30 AM'),
+        ('12:00', '12:00 PM'),
+        ('12:30', '12:30 PM'),
+        ('13:00', '01:00 PM'),
+        ('13:30', '01:30 PM'),
+        ('14:00', '02:00 PM'),
+        ('14:30', '02:30 PM'),
+        ('15:00', '03:00 PM'),
+        ('15:30', '03:30 PM'),
+        ('16:00', '04:00 PM'),
+        ('16:30', '04:30 PM'),
+        ('17:00', '05:00 PM'),
+        ('17:30', '05:30 PM'),
+        ('18:00', '06:00 PM'),
+    ]
+    
+    hora = forms.ChoiceField(
+        choices=HORAS_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+            'id': 'hora-select'
+        })
+    )
+    
     class Meta:
         model = Agenda
         fields = ['cliente', 'servicio', 'fecha', 'hora']
@@ -406,11 +449,6 @@ class CitaForm(forms.ModelForm):
                 'class': 'form-control',
                 'min': timezone.now().strftime('%Y-%m-%d'),
                 'required': True
-            }),
-            'hora': forms.Select(attrs={
-                'class': 'form-select',
-                'required': True,
-                'id': 'hora-select'
             })
         }
     

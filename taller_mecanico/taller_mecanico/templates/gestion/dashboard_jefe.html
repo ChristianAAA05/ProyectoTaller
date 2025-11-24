@@ -153,92 +153,36 @@
         </div>
     </div>
 </div>
-<!-- Gráficos y Estadísticas -->
+<!-- Resumen de Ingresos -->
 <div class="row mb-4">
-    <!-- Gráfico de Reparaciones por Estado -->
-    <div class="col-lg-8 mb-4">
-        <div class="card shadow h-100">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">
-                    <i class="fas fa-chart-pie me-2"></i>Estado de Reparaciones
-                </h6>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-list me-2"></i>Ver todas</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-file-export me-2"></i>Exportar</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configuración</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="chart-pie pt-4 pb-2">
-                            <canvas id="reparacionesChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="col-md-4 d-flex align-items-center">
-                        <div class="w-100">
-                            {% for item in reparaciones_por_estado %}
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between mb-1">
-                                    <span>
-                                        <i class="fas fa-circle me-2 {% if item.estado == 'Pendiente' %}text-warning{% elif item.estado == 'En Proceso' %}text-info{% elif item.estado == 'Completada' %}text-success{% else %}text-danger{% endif %}"></i>
-                                        {{ item.estado }}
-                                    </span>
-                                    <span class="fw-bold">{{ item.total }}</span>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar {% if item.estado == 'Pendiente' %}bg-warning{% elif item.estado == 'En Proceso' %}bg-info{% elif item.estado == 'Completada' %}bg-success{% else %}bg-danger{% endif %}" 
-                                         role="progressbar" 
-                                         style="width: {% if total_reparaciones > 0 %}{{ item.total|floatformat:0 }}{% else %}0{% endif %}%" 
-                                         aria-valuenow="{{ item.total }}" 
-                                         aria-valuemin="0" 
-                                         aria-valuemax="100">
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Ingresos y Estadísticas -->
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-12 mb-4">
         <div class="card shadow h-100">
             <div class="card-header bg-white py-3">
                 <h6 class="m-0 font-weight-bold text-primary">
-                    <i class="fas fa-chart-line me-2"></i>Ingresos Mensuales
+                    <i class="fas fa-dollar-sign me-2"></i>Resumen de Ingresos
                 </h6>
             </div>
             <div class="card-body">
-                {% if ingresos_mensuales %}
-                    <div class="chart-bar">
-                        <canvas id="ingresosChart" height="200"></canvas>
-                    </div>
-                    <div class="mt-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">Promedio mensual:</span>
-                            <span class="fw-bold">${{ promedio_mensual|floatformat:2|intcomma }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">Total últimos 6 meses:</span>
-                            <span class="fw-bold">${{ total_ingresos_mensuales|floatformat:2|intcomma }}</span>
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <h6 class="text-muted mb-2">Promedio Mensual</h6>
+                            <h3 class="text-primary mb-0">${{ promedio_mensual|floatformat:2|intcomma }}</h3>
                         </div>
                     </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-chart-line fa-3x text-gray-300 mb-3"></i>
-                        <p class="text-muted">No hay datos de ingresos disponibles</p>
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <h6 class="text-muted mb-2">Total Últimos 12 Meses</h6>
+                            <h3 class="text-success mb-0">${{ total_ingresos_mensuales|floatformat:2|intcomma }}</h3>
+                        </div>
                     </div>
-                {% endif %}
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 border rounded">
+                            <h6 class="text-muted mb-2">Total Histórico</h6>
+                            <h3 class="text-info mb-0">${{ ingresos_totales|floatformat:2|intcomma }}</h3>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -379,305 +323,61 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 <!-- Scripts para gráficos -->
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-// Gráfico de estado de reparaciones
-var ctx = document.getElementById('reparacionesChart').getContext('2d');
-var reparacionesChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-        labels: [
-            {% for item in reparaciones_por_estado %}'{{ item.estado }}',{% endfor %}
-        ],
-        datasets: [{
-            data: [
-                {% for item in reparaciones_por_estado %}{{ item.total }},{% endfor %}
-            ],
-            backgroundColor: [
-                'rgba(255, 193, 7, 0.7)',  // Amarillo para Pendiente
-                'rgba(23, 162, 184, 0.7)', // Azul claro para En Proceso
-                'rgba(40, 167, 69, 0.7)',  // Verde para Completada
-                'rgba(220, 53, 69, 0.7)'   // Rojo para Cancelada
-            ],
-            borderColor: [
-                'rgba(255, 193, 7, 1)',
-                'rgba(23, 162, 184, 1)',
-                'rgba(40, 167, 69, 1)',
-                'rgba(220, 53, 69, 1)'
-            ],
-            borderWidth: 1
-        }]
-    },
-    options: {
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            }
-        }
-    }
-});
-
-// Gráfico de ingresos mensuales
-var ctxBar = document.getElementById('ingresosChart').getContext('2d');
-var ingresosChart = new Chart(ctxBar, {
-    type: 'bar',
-    data: {
-        labels: {{ meses|safe }},
-        datasets: [{
-            label: 'Ingresos',
-            data: {{ ingresos|safe }},
-            backgroundColor: 'rgba(78, 115, 223, 0.8)',
-            borderColor: 'rgba(78, 115, 223, 1)',
-            borderWidth: 1
-        }]
-    },
-    options: {
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return '$' + value.toLocaleString();
-                    }
-                }
-            }
-        },
-        plugins: {
-            legend: {
-                display: false
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        return '$' + context.parsed.y.toLocaleString();
-                    }
-                }
-            }
-        }
-    }
-});
-</script>
-{% endblock %}
-
-<div class="card bg-info text-white mb-3" style="cursor: pointer;" onclick="window.location='{% url 'servicios-lista' %}'">
-    <div class="card-body p-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <div class="me-3">
-                    <i class="fas fa-tools fa-2x opacity-75"></i>
-                </div>
-                <div>
-                    <div class="small">Servicios</div>
-                    <div class="h4 mb-0">{{ total_servicios }}</div>
-                </div>
-            </div>
-            <i class="fas fa-chevron-right"></i>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Reparaciones Recientes -->
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Reparaciones Recientes</h6>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Vehículo</th>
-                                <th>Servicio</th>
-                                <th>Estado</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for reparacion in reparaciones_recientes %}
-                            <tr>
-                                <td>{{ reparacion.vehiculo.marca }} {{ reparacion.vehiculo.modelo }}</td>
-                                <td>{{ reparacion.servicio.nombre_servicio|truncatechars:20 }}</td>
-                                <td>
-                                    <span class="badge bg-{% if reparacion.estado == 'Completado' %}success{% elif reparacion.estado == 'En progreso' %}warning{% else %}secondary{% endif %}">
-                                        {{ reparacion.estado }}
-                                    </span>
-                                </td>
-                                <td>{{ reparacion.fecha_ingreso|date:"d/m/Y" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No hay reparaciones recientes</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-footer text-end">
-                <a href="{% url 'dashboard_reparaciones' %}" class="btn btn-sm btn-outline-primary">Ver todas las reparaciones</a>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Citas Próximas -->
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Próximas Citas</h6>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for cita in citas_proximas %}
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</h6>
-                            <small>{{ cita.fecha|date:"d/m/Y" }} - {{ cita.hora|time:"H:i" }}</small>
-                        </div>
-                        <p class="mb-1">{{ cita.servicio.nombre_servicio }}</p>
-                        <small class="text-muted">{{ cita.vehiculo.marca }} {{ cita.vehiculo.modelo }} - {{ cita.vehiculo.placa }}</small>
-                    </div>
-                    {% empty %}
-                    <div class="p-3 text-center text-muted">
-                        No hay citas programadas para los próximos días
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="card-footer text-end">
-                <a href="{% url 'lista_citas' %}" class="btn btn-sm btn-outline-primary">Ver todas las citas</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Empleados Destacados -->
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Empleados Destacados</h6>
-            </div>
-            <div class="card-body">
-                {% if empleados_destacados %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Puesto</th>
-                                <th>Reparaciones (30 días)</th>
-                                <th>Eficiencia</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for empleado in empleados_destacados %}
-                            <tr>
-                                <td>{{ empleado.nombre }}</td>
-                                <td>{{ empleado.puesto }}</td>
-                                <td>{{ empleado.num_reparaciones|default:0 }}</td>
-                                <td>
-                                    <div class="progress" style="height: 20px;">
-                                        <div class="progress-bar bg-success" role="progressbar" 
-                                             style="width: {% widthratio empleado.num_reparaciones 10 100 %}%" 
-                                             aria-valuenow="{{ empleado.num_reparaciones }}" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="100">
-                                            {{ empleado.num_reparaciones|default:0 }}
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="fas fa-info-circle fa-3x mb-3"></i>
-                    <p>No hay datos suficientes para mostrar empleados destacados</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Estado de Reparaciones -->
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Estado de Reparaciones</h6>
-            </div>
-            <div class="card-body">
-                {% if reparaciones_por_estado %}
-                <div class="chart-container" style="position: relative; height: 250px;">
-                    <canvas id="reparacionesChart"></canvas>
-                </div>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="fas fa-chart-pie fa-3x mb-3"></i>
-                    <p>No hay datos de reparaciones disponibles</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Script para el gráfico de reparaciones -->
-{% if reparaciones_por_estado %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% load static %}
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('reparacionesChart').getContext('2d');
-    const labels = [{% for estado in reparaciones_por_estado %}'{{ estado.estado }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
-    const data = [{% for estado in reparaciones_por_estado %}{{ estado.total }}{% if not forloop.last %}, {% endif %}{% endfor %}];
-    const backgroundColors = [
-        'rgba(54, 162, 235, 0.7)',
-        'rgba(255, 99, 132, 0.7)',
-        'rgba(255, 206, 86, 0.7)',
-        'rgba(75, 192, 192, 0.7)',
-        'rgba(153, 102, 255, 0.7)',
-    ];
-    
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: backgroundColors,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} (${percentage}%)`;
+    // Gráfico de estado de reparaciones
+    {% if reparaciones_por_estado %}
+    const ctx2 = document.getElementById('reparacionesChart');
+    if (ctx2) {
+        const labels = [{% for estado in reparaciones_por_estado %}'{{ estado.estado }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+        const data = [{% for estado in reparaciones_por_estado %}{{ estado.total }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+        const backgroundColors = [
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+        ];
+        
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: backgroundColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    }
+    {% endif %}
 });
 </script>
-{% endif %}
 {% endblock %}

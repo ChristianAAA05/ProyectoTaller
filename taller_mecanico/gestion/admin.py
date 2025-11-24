@@ -36,9 +36,9 @@ class ServicioAdmin(admin.ModelAdmin):
     list_filter = ('nombre_servicio',)
 
 class VehiculoAdmin(admin.ModelAdmin):
-    list_display = ('marca', 'modelo', 'año', 'placa', 'cliente', 'get_cliente_telefono', 'get_cliente_email')
+    list_display = ('marca', 'modelo', 'año', 'placa', 'vin', 'cliente', 'get_cliente_telefono', 'get_cliente_email')
     search_fields = (
-        'marca', 'modelo', 'placa', 
+        'marca', 'modelo', 'placa', 'vin',
         'cliente__nombre', 'cliente__apellido',
         'cliente__telefono', 'cliente__correo_electronico'
     )
@@ -51,6 +51,10 @@ class VehiculoAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Información del Vehículo', {
             'fields': ('marca', 'modelo', 'año', 'placa')
+        }),
+        ('Datos Adicionales', {
+            'fields': ('vin',),
+            'classes': ('collapse',)
         }),
         ('Propietario', {
             'fields': ('cliente',)

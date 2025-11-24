@@ -144,6 +144,21 @@
                                                     {% endif %}
                                                 </div>
                                             </div>
+                                            <div class="row">
+                                                <div class="col-md-11 mb-3">
+                                                    {{ vehiculo_form.vin.label_tag }}
+                                                    <small class="text-muted">(Opcional)</small>
+                                                    {{ vehiculo_form.vin }}
+                                                    <small class="form-text text-muted">
+                                                        <i class="fas fa-barcode me-1"></i>Número de Identificación del Vehículo (17 caracteres)
+                                                    </small>
+                                                    {% if vehiculo_form.vin.errors %}
+                                                        <div class="text-danger">
+                                                            {{ vehiculo_form.vin.errors.0 }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -213,6 +228,15 @@
                             <button type="button" class="btn btn-outline-danger btn-sm remove-vehiculo">
                                 <i class="fas fa-trash"></i>
                             </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-11 mb-3">
+                            <label for="id_vehiculos-${formCount}-vin">VIN (Número de Identificación) <small class="text-muted">(Opcional)</small></label>
+                            <input type="text" name="vehiculos-${formCount}-vin" class="form-control" maxlength="17" placeholder="Ingrese el VIN (17 caracteres)" style="text-transform: uppercase;" id="id_vehiculos-${formCount}-vin">
+                            <small class="form-text text-muted">
+                                <i class="fas fa-barcode me-1"></i>Número de Identificación del Vehículo (17 caracteres)
+                            </small>
                         </div>
                     </div>
                 `;

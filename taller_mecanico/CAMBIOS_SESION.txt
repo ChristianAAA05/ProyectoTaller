@@ -1,0 +1,129 @@
+RESUMEN DE CAMBIOS - Sesión 24 Nov 2025
+==========================================
+
+## 1. CAMPO VIN EN GESTIÓN DE REPARACIONES (MECÁNICO)
+Archivo: taller_mecanico/templates/gestion/gestionar_reparacion_mecanico.html
+- Agregado campo VIN en sección "Datos Adicionales del Vehículo"
+- Input de texto con validación de 17 caracteres
+- Conversión automática a mayúsculas con JavaScript
+- Ubicación: Líneas 169-182
+
+## 2. CORRECCIÓN DASHBOARD JEFE - Eliminación de Gráfico Duplicado
+Archivo: taller_mecanico/templates/gestion/dashboard_jefe.html
+
+Cambios principales:
+a) Eliminado gráfico grande de "Estado de Reparaciones" (verde, amarillo, azul)
+   - Era un gráfico tipo donut que ocupaba col-lg-8
+   - Eliminadas líneas con código duplicado (167 líneas)
+
+b) Corregido error de template "Unclosed tag on line 4: 'block'"
+   - Agregado {% endblock %} faltante en línea 327
+   - Eliminado contenido HTML duplicado fuera de bloques
+
+c) Reemplazado gráfico de ingresos con cards simples
+   - Sección "Resumen de Ingresos" con 3 cards (líneas 156-189):
+     * Promedio Mensual
+     * Total Últimos 12 Meses  
+     * Total Histórico
+   - Sin dependencias de Chart.js problemáticas
+
+d) Consolidado JavaScript
+   - Eliminado código de debug extenso
+   - Mantenido solo gráfico de "Estado de Reparaciones" (circular, abajo)
+   - Script limpio y funcional
+
+## 3. VISTA DE DASHBOARD JEFE - Procesamiento de Datos
+Archivo: gestion/views.py
+
+Cambios en función dashboard_jefe (líneas 770-791):
+a) Actualizado procesamiento de ingresos mensuales a 12 meses (antes 6)
+   - Líneas 780-781: meses = meses_all[-12:] 
+   
+b) Mejorado manejo de datos con validación de nulos
+   - Procesamiento más robusto en loop (líneas 779-785)
+
+c) Agregado json.dumps para exportar datos a JavaScript
+   - Línea 830: 'meses': json.dumps(meses)
+   - Línea 831: 'ingresos': json.dumps(ingresos)
+
+d) Agregado import necesario
+   - Línea 16: import json
+   - Línea 17: from io import BytesIO
+
+## 4. EXPORTACIÓN A EXCEL - Corrección de Import
+Archivo: gestion/views.py
+- Línea 17: Agregado "from io import BytesIO"
+- Corrige error: NameError: name 'BytesIO' is not defined
+- Necesario para función exportar_ingresos_excel (línea 1064)
+
+## 5. RECURSOS ESTÁTICOS - Chart.js Local
+Directorio: taller_mecanico/static/js/
+- Descargado Chart.js 4.4.1 localmente (200 KB)
+- Archivo: chart.umd.min.js
+- Elimina dependencia de CDNs externos
+- Ejecutado collectstatic
+
+## 6. TEMPLATE BASE - Sin cambios estructurales
+Los templates base (base.html, base_dashboard.html) permanecen sin cambios
+
+==========================================
+ARCHIVOS MODIFICADOS:
+==========================================
+1. taller_mecanico/templates/gestion/gestionar_reparacion_mecanico.html
+2. taller_mecanico/templates/gestion/dashboard_jefe.html  
+3. gestion/views.py
+4. taller_mecanico/static/js/chart.umd.min.js (nuevo)
+
+==========================================
+FUNCIONALIDADES AGREGADAS/CORREGIDAS:
+==========================================
+✅ Campo VIN visible y editable en gestión de reparaciones del mecánico
+✅ Dashboard del jefe sin errores de template
+✅ Resumen de ingresos con cards limpios (sin gráficos problemáticos)
+✅ Exportación a Excel funcionando correctamente
+✅ Datos de ingresos mostrando últimos 12 meses
+✅ Chart.js funcionando para gráfico de estado de reparaciones
+
+==========================================
+BUGS CORREGIDOS:
+==========================================
+🐛 Error: "Unclosed tag on line 4: 'block'" en dashboard_jefe.html
+🐛 Error: NameError 'BytesIO' is not defined en exportar_ingresos_excel
+🐛 Contenido HTML duplicado causando conflictos en dashboard
+🐛 Gráfico de ingresos no renderizando (reemplazado por cards)
+
+==========================================
+COMANDOS GIT SUGERIDOS:
+==========================================
+git add gestion/views.py
+git add taller_mecanico/templates/gestion/gestionar_reparacion_mecanico.html
+git add taller_mecanico/templates/gestion/dashboard_jefe.html
+git add taller_mecanico/static/js/chart.umd.min.js
+
+git commit -m "feat: Agregar campo VIN en gestión mecánico y corregir dashboard jefe
+
+- Agregado campo VIN en datos adicionales del vehículo (mecánico)
+- Corregido error de template en dashboard jefe (bloque sin cerrar)
+- Eliminado gráfico duplicado de estado de reparaciones
+- Reemplazado gráfico de ingresos con cards simples y limpios
+- Actualizado procesamiento de ingresos a 12 meses
+- Agregado import BytesIO para exportación Excel
+- Descargado Chart.js localmente para mejor rendimiento
+- Limpiado código JavaScript de debug"
+
+==========================================
+LÍNEAS DE CÓDIGO MODIFICADAS (aproximado):
+==========================================
+- gestionar_reparacion_mecanico.html: +18 líneas
+- dashboard_jefe.html: -167 líneas, +45 líneas (reducción neta)
+- views.py: +15 líneas
+- chart.umd.min.js: +5000 líneas (archivo nuevo)
+
+==========================================
+TESTING RECOMENDADO:
+==========================================
+1. Verificar campo VIN en gestión de reparaciones (como mecánico)
+2. Verificar dashboard jefe carga sin errores
+3. Verificar cards de resumen de ingresos muestran datos
+4. Verificar exportación Excel funciona
+5. Verificar gráfico circular de reparaciones funciona

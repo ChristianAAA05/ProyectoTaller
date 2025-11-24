@@ -1,0 +1,93 @@
+{% extends 'gestion/citas/base_citas.html' %}
+{% load static %}
+
+{% block titulo_pagina %}Detalle de Cita{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item active">Detalle</li>
+{% endblock %}
+
+{% block titulo %}Detalle de la Cita{% endblock %}
+
+{% block acciones %}
+    <div class="btn-group" role="group">
+        <a href="{% url 'editar_cita' cita.pk %}" class="btn btn-warning btn-sm">
+            <i class="fas fa-edit"></i> Editar
+        </a>
+        <a href="{% url 'eliminar_cita' cita.pk %}" class="btn btn-danger btn-sm">
+            <i class="fas fa-trash"></i> Eliminar
+        </a>
+        <a href="{% url 'lista_citas' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+{% endblock %}
+
+{% block contenido_cita %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Cliente</h6>
+                        <p class="fs-5">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Servicio</h6>
+                        <p class="fs-5">{{ cita.servicio.nombre_servicio }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Fecha</h6>
+                        <p class="fs-5">
+                            <i class="fas fa-calendar-alt text-primary me-2"></i>
+                            {{ cita.fecha|date:"d/m/Y" }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Hora</h6>
+                        <p class="fs-5">
+                            <i class="fas fa-clock text-primary me-2"></i>
+                            {{ cita.hora|time:"H:i" }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Correo del Cliente</h6>
+                        <p>{{ cita.cliente.correo_electronico }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Teléfono del Cliente</h6>
+                        <p>{{ cita.cliente.telefono }}</p>
+                    </div>
+                </div>
+                
+                {% if cita.servicio.descripcion %}
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-2">Descripción del Servicio</h6>
+                        <p>{{ cita.servicio.descripcion }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Duración Estimada</h6>
+                        <p>{{ cita.servicio.duracion }} minutos</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Costo</h6>
+                        <p class="fs-5 text-success fw-bold">${{ cita.servicio.costo }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

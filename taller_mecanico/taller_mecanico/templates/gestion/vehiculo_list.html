@@ -94,6 +94,7 @@
                             <th>Marca</th>
                             <th>Modelo</th>
                             <th>Año</th>
+                            <th>VIN</th>
                             <th>Cliente</th>
                             <th>Teléfono</th>
                             <th>Acciones</th>
@@ -106,6 +107,15 @@
                             <td>{{ vehiculo.marca }}</td>
                             <td>{{ vehiculo.modelo }}</td>
                             <td>{{ vehiculo.año }}</td>
+                            <td>
+                                {% if vehiculo.vin %}
+                                    <span class="badge bg-info text-dark" title="VIN completo: {{ vehiculo.vin }}">
+                                        {{ vehiculo.vin|truncatechars:10 }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>{{ vehiculo.cliente.nombre }} {{ vehiculo.cliente.apellido }}</td>
                             <td>{{ vehiculo.cliente.telefono }}</td>
                             <td>
