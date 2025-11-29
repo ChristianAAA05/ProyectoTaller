@@ -81,15 +81,10 @@ def es_jefe_o_encargado(user):
 
 
 def es_mecanico(user):
-    """Verifica si el usuario es un mecánico"""
+    """Verifica si el usuario es mecánico"""
     if not user.is_authenticated:
         return False
-        
-    # Verificar si el perfil existe, es empleado y tiene un empleado relacionado
-    if hasattr(user, 'profile') and user.profile.es_empleado and hasattr(user.profile, 'empleado_relacionado'):
-        empleado = user.profile.empleado_relacionado
-        if empleado and hasattr(empleado, 'puesto'):
-            return empleado.puesto.lower() in ['mecanico', 'técnico', 'taller']
+    return hasattr(user, 'profile') and hasattr(user.profile, 'es_mecanico') and user.profile.es_mecanico
             
     return False
 
@@ -104,14 +99,29 @@ def login_view(request):
             login(request, user)
             messages.success(request, 'Inicio de sesión exitoso.')
             
+            # DEBUG: Imprimir valores para depuración
+            print(f"DEBUG: Usuario autenticado: {user.username}")
+            print(f"DEBUG: Tiene profile: {hasattr(user, 'profile')}")
+            if hasattr(user, 'profile'):
+                print(f"DEBUG: profile.es_jefe: {user.profile.es_jefe}")
+                print(f"DEBUG: profile.es_encargado: {user.profile.es_encargado}")
+                print(f"DEBUG: profile.es_mecanico: {user.profile.es_mecanico}")
+                print(f"DEBUG: es_jefe(user): {es_jefe(user)}")
+                print(f"DEBUG: es_encargado(user): {es_encargado(user)}")
+                print(f"DEBUG: es_mecanico(user): {es_mecanico(user)}")
+            
             # Redirigir según el rol del usuario
             if es_jefe(user):
+                print("DEBUG: Redirigiendo a dashboard_jefe")
                 return redirect('dashboard_jefe')
             elif es_encargado(user):
+                print("DEBUG: Redirigiendo a dashboard_encargado")
                 return redirect('dashboard_encargado')
             elif es_mecanico(user):
+                print("DEBUG: Redirigiendo a dashboard_mecanico")
                 return redirect('dashboard_mecanico')
             else:
+                print("DEBUG: Redirigiendo a inicio")
                 return redirect('inicio')
         messages.error(request, 'Usuario o contraseña incorrectos.')
     return render(request, 'auth/login.html')
@@ -268,14 +278,31 @@ def cambiar_estado_tarea(request, tarea_id, nuevo_estado):
 
 @login_required
 def inicio(request):
+    # DEBUG: Imprimir valores para depuración en la vista inicio
+    print(f"DEBUG INICIO: Usuario actual: {request.user.username}")
+    print(f"DEBUG INICIO: Está autenticado: {request.user.is_authenticated}")
+    if request.user.is_authenticated:
+        print(f"DEBUG INICIO: Tiene profile: {hasattr(request.user, 'profile')}")
+        if hasattr(request.user, 'profile'):
+            print(f"DEBUG INICIO: profile.es_jefe: {request.user.profile.es_jefe}")
+            print(f"DEBUG INICIO: profile.es_encargado: {request.user.profile.es_encargado}")
+            print(f"DEBUG INICIO: profile.es_mecanico: {request.user.profile.es_mecanico}")
+            print(f"DEBUG INICIO: es_jefe(request.user): {es_jefe(request.user)}")
+            print(f"DEBUG INICIO: es_encargado(request.user): {es_encargado(request.user)}")
+            print(f"DEBUG INICIO: es_mecanico(request.user): {es_mecanico(request.user)}")
+    
     # Redirigir según el rol del usuario
     if es_jefe(request.user):
+        print("DEBUG INICIO: Redirigiendo a dashboard_jefe")
         return redirect('dashboard_jefe')
     elif es_encargado(request.user):
+        print("DEBUG INICIO: Redirigiendo a dashboard_encargado")
         return redirect('dashboard_encargado')
     elif es_mecanico(request.user):
+        print("DEBUG INICIO: Redirigiendo a dashboard_mecanico")
         return redirect('dashboard_mecanico')
         
+    print("DEBUG INICIO: Mostrando dashboard básico (no redirige)")
     # Si no es ni jefe, ni encargado, ni mecánico, mostrar dashboard básico
     total_clientes = Cliente.objects.count()
     total_empleados = Empleado.objects.count()
@@ -1569,7 +1596,7 @@ def tomar_reparacion(request, reparacion_id):
     # Verificar que el usuario sea un mecánico
     if not hasattr(request.user, 'profile') or not hasattr(request.user.profile, 'es_mecanico') or not request.user.profile.es_mecanico:
         messages.error(request, 'No tienes permiso para realizar esta acción.')
-        return redirect('dashboard')
+        return redirect('dashboard_mecanico')
     
     # Obtener la reparación
     reparacion = get_object_or_404(Reparacion, id=reparacion_id)
@@ -1611,7 +1638,7 @@ def listar_reparaciones_disponibles(request):
     # Verificar que el usuario sea un mecánico
     if not hasattr(request.user, 'profile') or not hasattr(request.user.profile, 'es_mecanico') or not request.user.profile.es_mecanico:
         messages.error(request, 'No tienes permiso para ver esta página.')
-        return redirect('dashboard')
+        return redirect('dashboard_mecanico')
     
     # Obtener las reparaciones disponibles (sin asignar o asignadas al usuario actual)
     reparaciones = Reparacion.objects.filter(
@@ -1645,7 +1672,7 @@ def detalle_reparacion(request, pk):
         (not hasattr(request.user, 'empleado') or 
          reparacion.mecanico_asignado != request.user.empleado)):
         messages.error(request, 'No tienes permiso para ver esta reparación.')
-        return redirect('dashboard')
+        return redirect('dashboard_encargado')
     
     # Obtener tareas relacionadas con esta reparación
     tareas = Tarea.objects.filter(reparacion=reparacion).order_by('fecha_creacion')

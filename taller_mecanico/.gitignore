@@ -1,0 +1,38 @@
+# Variables de entorno - CONTIENE SECRETOS
+.env
+
+# Base de datos
+*.sqlite3
+db.sqlite3
+
+# Archivos de cache de Django
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Archivos estáticos compilados
+/static/
+/staticfiles/
+/media/
+
+# Archivos de log
+*.log
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.tmp
+*.temp

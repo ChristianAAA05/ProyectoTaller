@@ -1,0 +1,530 @@
+"""
+Management command para ejecutar el bot de Telegram del taller mecánico.
+
+Este comando inicia el bot que permite a los clientes:
+- Recibir un saludo de bienvenida
+- Ser guiados paso a paso para crear citas
+- Seleccionar servicios con botones
+- Ingresar información de vehículo y contacto
+- Confirmar y guardar la cita como reparación disponible para mecánicos
+
+Uso:
+    python manage.py run_telegram_bot
+
+El bot se ejecutará en modo polling (ideal para desarrollo).
+Para producción, considerar cambiar a webhooks.
+"""
+
+import os
+import logging
+from django.core.management.base import BaseCommand
+from django.conf import settings
+from asgiref.sync import sync_to_async
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
+from gestion.models import Cliente, Vehiculo, Servicio, Reparacion
+
+# Configurar logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Estados de la conversación
+START, PHONE, NAME, VEHICLE_BRAND, VEHICLE_MODEL, VEHICLE_YEAR, VEHICLE_PLATE, SERVICE_SELECT, CONFIRMATION = range(9)
+
+class Command(BaseCommand):
+    help = 'Ejecuta el bot de Telegram para el taller mecánico'
+
+    def handle(self, *args, **options):
+        """Inicia el bot de Telegram"""
+        
+        # Obtener token del bot (debería estar en settings.py o variables de entorno)
+        bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
+        if not bot_token:
+            bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        
+        if not bot_token:
+            self.stdout.write(
+                self.style.ERROR('TELEGRAM_BOT_TOKEN no está configurado en settings.py o variables de entorno')
+            )
+            return
+
+        # Crear aplicación del bot
+        application = Application.builder().token(bot_token).build()
+
+        # Crear manejador de conversación
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start_command)],
+            states={
+                START: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
+                PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
+                NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_vehicle_brand)],
+                VEHICLE_BRAND: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_vehicle_model)],
+                VEHICLE_MODEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_vehicle_year)],
+                VEHICLE_YEAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_vehicle_plate)],
+                VEHICLE_PLATE: [CallbackQueryHandler(select_service)],
+                SERVICE_SELECT: [CallbackQueryHandler(select_service)],
+                CONFIRMATION: [CallbackQueryHandler(confirm_appointment)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel_command)],
+            per_user=False,  # Cambiado de True a False
+            per_chat=True,
+            allow_reentry=True
+        )
+
+        # Agregar manejadores
+        application.add_handler(conv_handler)
+        application.add_handler(CommandHandler('help', help_command))
+
+        # Iniciar el bot
+        self.stdout.write(self.style.SUCCESS('🤖 Bot de Telegram iniciado...'))
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Maneja el comando /start - punto de entrada del bot"""
+    
+    # DEBUG: Log para verificar si se está llamando esta función
+    logger.info(f"🎯 COMANDO /START RECIBIDO de usuario: {update.effective_user.username}")
+    print(f"🎯 COMANDO /START RECIBIDO de usuario: {update.effective_user.username}")
+    
+    user = update.effective_user
+    
+    welcome_message = f"""
+🔧 *¡Bienvenido al Taller Mecánico!* 🔧
+
+Hola {user.first_name}! 👋
+Soy el asistente virtual del taller y te ayudaré a agendar tu cita.
+
+Para comenzar, necesito algunos datos:
+📱 Tu número de teléfono
+👤 Tu nombre completo
+🚗 Información de tu vehículo
+⚙️ El servicio que necesitas
+📅 Fecha y hora preferida
+
+Por favor, envíame tu número de teléfono para continuar:
+"""
+    
+    try:
+        await update.message.reply_text(
+            welcome_message,
+            parse_mode='Markdown'
+        )
+        logger.info("✅ Mensaje de bienvenida enviado exitosamente")
+        print("✅ Mensaje de bienvenida enviado exitosamente")
+        return START
+    except Exception as e:
+        logger.error(f"❌ Error al enviar mensaje de bienvenida: {e}")
+        print(f"❌ Error al enviar mensaje de bienvenida: {e}")
+        return ConversationHandler.END
+
+
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene el número de teléfono del cliente"""
+    phone = update.message.text.strip()
+    
+    # Validación básica del teléfono
+    if not phone.replace('+', '').replace('-', '').replace(' ', '').isdigit():
+        await update.message.reply_text(
+            "❌ Por favor, ingresa un número de teléfono válido.\n"
+            "Ejemplo: +595 981 234567 o 0981234567"
+        )
+        return START
+    
+    # Guardar teléfono en contexto
+    context.user_data['phone'] = phone
+    
+    await update.message.reply_text(
+        f"✅ Teléfono guardado: {phone}\n\n"
+        "Ahora, por favor envíame tu nombre completo:"
+    )
+    
+    return PHONE
+
+
+async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene el nombre del cliente"""
+    name = update.message.text.strip()
+    
+    if len(name) < 3:
+        await update.message.reply_text(
+            "❌ Por favor, ingresa tu nombre completo (mínimo 3 caracteres):"
+        )
+        return PHONE
+    
+    # Guardar nombre en contexto
+    context.user_data['name'] = name
+    
+    await update.message.reply_text(
+        f"✅ Nombre guardado: {name}\n\n"
+        "Ahora necesito la información de tu vehículo.\n\n"
+        "¿Cuál es la marca de tu vehículo? (Ej: Toyota, Ford, Volkswagen)"
+    )
+    
+    return NAME
+
+
+async def get_vehicle_brand(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene la marca del vehículo"""
+    brand = update.message.text.strip().capitalize()
+    
+    if len(brand) < 2:
+        await update.message.reply_text(
+            "❌ Por favor, ingresa una marca válida:"
+        )
+        return VEHICLE_BRAND
+    
+    context.user_data['vehicle_brand'] = brand
+    
+    await update.message.reply_text(
+        f"✅ Marca: {brand}\n\n"
+        "¿Cuál es el modelo de tu vehículo? (Ej: Corolla, Focus, Gol)"
+    )
+    
+    return VEHICLE_BRAND
+
+
+async def get_vehicle_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene el modelo del vehículo"""
+    model = update.message.text.strip().capitalize()
+    
+    if len(model) < 2:
+        await update.message.reply_text(
+            "❌ Por favor, ingresa un modelo válido:"
+        )
+        return VEHICLE_MODEL
+    
+    context.user_data['vehicle_model'] = model
+    
+    await update.message.reply_text(
+        f"✅ Modelo: {model}\n\n"
+        "¿Cuál es el año de tu vehículo? (Ej: 2020, 2021, 2022)"
+    )
+    
+    return VEHICLE_MODEL
+
+
+async def get_vehicle_year(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene el año del vehículo"""
+    year_text = update.message.text.strip()
+    
+    try:
+        year = int(year_text)
+        current_year = 2024
+        
+        if year < 1900 or year > current_year + 1:
+            await update.message.reply_text(
+                f"❌ Por favor, ingresa un año válido entre 1900 y {current_year + 1}:"
+            )
+            return VEHICLE_YEAR
+            
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Por favor, ingresa un año válido (solo números):"
+        )
+        return VEHICLE_YEAR
+    
+    context.user_data['vehicle_year'] = year
+    
+    await update.message.reply_text(
+        f"✅ Año: {year}\n\n"
+        "¿Cuál es la placa de tu vehículo? (Ej: ABC1234)"
+    )
+    
+    return VEHICLE_YEAR
+
+
+async def get_vehicle_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Obtiene la placa del vehículo y muestra servicios disponibles"""
+    plate = update.message.text.strip().upper()
+    
+    # DEBUG: Log para ver qué placa se está procesando
+    logger.info(f"🔍 Placa recibida: '{plate}' (longitud: {len(plate)})")
+    print(f"🔍 Placa recibida: '{plate}' (longitud: {len(plate)})")
+    
+    # Validación más flexible: solo verificar que no esté vacía y tenga longitud razonable
+    if len(plate) < 1 or len(plate) > 20:
+        await update.message.reply_text(
+            "❌ Por favor, ingresa una placa válida (máximo 20 caracteres):"
+        )
+        return VEHICLE_PLATE
+    
+    context.user_data['vehicle_plate'] = plate
+    
+    logger.info(f"✅ Placa guardada: {plate}")
+    print(f"✅ Placa guardada: {plate}")
+    
+    # Obtener servicios disponibles
+    try:
+        logger.info("🔍 Buscando servicios en la base de datos...")
+        
+        # Usar sync_to_async para acceder a la base de datos desde contexto asíncrono
+        servicios = await sync_to_async(list)(Servicio.objects.all())
+        print(f"📊 Servicios encontrados: {len(servicios)}")
+        
+        if not servicios:
+            await update.message.reply_text(
+                "❌ No hay servicios disponibles en este momento.\n"
+                "Por favor, contacta al taller directamente."
+            )
+            logger.error("❌ No se encontraron servicios en la base de datos")
+            return ConversationHandler.END
+        
+        # Crear botones para servicios
+        keyboard = []
+        for servicio in servicios:
+            keyboard.append([InlineKeyboardButton(
+                f"{servicio.nombre_servicio} - ${servicio.costo}",
+                callback_data=f"service_{servicio.id}"
+            )])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        service_message = f"✅ Placa: {plate}\n\n🔧 *Selecciona el servicio que necesitas:*\n"
+        
+        await update.message.reply_text(
+            service_message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+        logger.info("✅ Servicios mostrados al usuario")
+        print("✅ Servicios mostrados al usuario")
+        logger.info("🔄 Retornando estado SERVICE_SELECT")
+        print("🔄 Retornando estado SERVICE_SELECT")
+        return SERVICE_SELECT
+        
+    except Exception as e:
+        logger.error(f"❌ Error al obtener servicios: {e}")
+        print(f"❌ Error al obtener servicios: {e}")
+        await update.message.reply_text(
+            "❌ Error al cargar los servicios. Por favor, intenta más tarde."
+        )
+        return ConversationHandler.END
+
+
+async def select_service(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Maneja la selección del servicio y va directamente a confirmación"""
+    query = update.callback_query
+    await query.answer()
+    
+    service_id = query.data.split('_')[1]
+    
+    try:
+        # Usar sync_to_async para obtener el servicio
+        servicio = await sync_to_async(Servicio.objects.get)(id=service_id)
+        context.user_data['service'] = servicio
+        
+        # Preparar mensaje de confirmación
+        service_message = (
+            f"✅ *Servicio seleccionado:*\n"
+            f"🔧 {servicio.nombre_servicio}\n"
+            f"💰 Costo: ${servicio.costo}\n"
+            f"⏱️ Duración estimada: {servicio.duracion} minutos\n\n"
+            f"📋 *Resumen de tu solicitud:*\n"
+            f"👤 Cliente: {context.user_data['name']}\n"
+            f"📞 Teléfono: {context.user_data['phone']}\n"
+            f"🚗 Vehículo: {context.user_data['vehicle_brand']} {context.user_data['vehicle_model']} ({context.user_data['vehicle_year']})\n"
+            f"🔢 Placa: {context.user_data['vehicle_plate']}\n\n"
+            f"🤖 *Esta solicitud aparecerá inmediatamente en Reparaciones Disponibles*\n"
+            f"para que los mecánicos puedan tomar tu trabajo.\n\n"
+            f"¿Confirmas esta solicitud de reparación?"
+        )
+        
+        # Crear botones de confirmación
+        keyboard = [
+            [InlineKeyboardButton("✅ Sí, confirmar", callback_data="confirm_yes")],
+            [InlineKeyboardButton("❌ No, cancelar", callback_data="confirm_no")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            service_message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+        return CONFIRMATION
+        
+    except Exception as e:
+        logger.error(f"❌ Error al obtener servicio: {e}")
+        await query.edit_message_text(
+            "❌ Servicio no encontrado. Por favor, selecciona otro."
+        )
+        return VEHICLE_PLATE
+
+
+def create_date_keyboard():
+    """Crea un teclado con las próximas fechas disponibles"""
+    from datetime import datetime, timedelta
+    
+    keyboard = []
+    current_date = datetime.now()
+    
+    # Mostrar próximos 7 días
+    for i in range(1, 8):
+        date = current_date + timedelta(days=i)
+        date_str = date.strftime("%Y-%m-%d")
+        display_str = date.strftime("%d/%m/%Y (%A)")
+        keyboard.append([InlineKeyboardButton(
+            display_str,
+            callback_data=f"date_{date_str}"
+        )])
+    
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Maneja la selección de fecha y muestra horas disponibles"""
+    query = update.callback_query
+    await query.answer()
+    
+    # DEBUG: Verificar qué callback_data se está recibiendo
+    logger.info(f"🔍 Callback data recibido: '{query.data}'")
+    print(f"🔍 Callback data recibido: '{query.data}'")
+    
+    # Extraer fecha del callback_data
+    if query.data.startswith('date_'):
+        date_str = query.data[5:]  # Remover 'date_' del inicio
+    else:
+        date_str = query.data.split('_')[1] if len(query.data.split('_')) > 1 else query.data
+    
+    logger.info(f"🔍 Fecha extraída: '{date_str}'")
+    print(f"🔍 Fecha extraída: '{date_str}'")
+    
+    context.user_data['date'] = date_str
+    
+    # Convertir string a fecha
+    from datetime import datetime
+    try:
+        selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        display_date = selected_date.strftime("%d/%m/%Y")
+    except ValueError as e:
+        logger.error(f"❌ Error al parsear fecha '{date_str}': {e}")
+        await query.edit_message_text(
+            f"❌ Error al procesar la fecha: {date_str}\n"
+            f"Por favor, selecciona otra fecha."
+        )
+        return SERVICE_SELECT
+    
+    # Obtener horas disponibles
+    available_hours = get_available_hours(date_str)
+    
+    if not available_hours:
+        await query.edit_message_text(
+            f"❌ No hay horas disponibles para el {display_date}.\n"
+            "Por favor, selecciona otra fecha."
+        )
+        return SERVICE_SELECT
+    
+    # Crear teclado con horas disponibles
+    keyboard = []
+    for hour in available_hours:
+        keyboard.append([InlineKeyboardButton(
+            hour,
+            callback_data=f"time_{hour}"
+        )])
+    
+    async def create_appointment_in_db(data):
+    """Crea la reparación en la base de datos para que aparezca en Reparaciones Disponibles"""
+    try:
+        from datetime import datetime, time
+        
+        # Obtener o crear cliente usando teléfono como identificador único
+        # Usamos un email temporal pero verificamos por teléfono para evitar duplicados
+        try:
+            cliente = await sync_to_async(Cliente.objects.get)(telefono=data['phone'])
+            # Actualizar nombre si es diferente
+            if cliente.nombre != data['name'].split()[0]:
+                cliente.nombre = data['name'].split()[0]
+                cliente.apellido = ' '.join(data['name'].split()[1:]) if len(data['name'].split()) > 1 else ''
+                await sync_to_async(cliente.save)()
+        except Cliente.DoesNotExist:
+            # Crear nuevo cliente con email temporal único
+            import uuid
+            temp_email = f"telegram_{data['phone']}_{uuid.uuid4().hex[:8]}@bot.local"
+            cliente = await sync_to_async(Cliente.objects.create)(
+                correo_electronico=temp_email,
+                nombre=data['name'].split()[0],  # Primer nombre
+                apellido=' '.join(data['name'].split()[1:]) if len(data['name'].split()) > 1 else '',  # Resto
+                telefono=data['phone'],
+                direccion='Cliente Telegram'  # Dirección temporal
+            )
+        
+        # Verificar si el vehículo ya existe para este cliente
+        try:
+            vehiculo = await sync_to_async(Vehiculo.objects.get)(
+                cliente=cliente,
+                placa=data['vehicle_plate']
+            )
+            # Actualizar datos del vehículo si son diferentes
+            if (vehiculo.marca != data['vehicle_brand'] or 
+                vehiculo.modelo != data['vehicle_model'] or 
+                vehiculo.año != data['vehicle_year']):
+                vehiculo.marca = data['vehicle_brand']
+                vehiculo.modelo = data['vehicle_model']
+                vehiculo.año = data['vehicle_year']
+                await sync_to_async(vehiculo.save)()
+        except Vehiculo.DoesNotExist:
+            # Crear nuevo vehículo
+            vehiculo = await sync_to_async(Vehiculo.objects.create)(
+                cliente=cliente,
+                marca=data['vehicle_brand'],
+                modelo=data['vehicle_model'],
+                año=data['vehicle_year'],
+                placa=data['vehicle_plate']
+            )
+        
+        # Crear reparación directamente (no Agenda) para que aparezca en Reparaciones Disponibles
+        reparacion = await sync_to_async(Reparacion.objects.create)(
+            vehiculo=vehiculo,
+            servicio=data['service'],
+            mecanico_asignado=None,  # Sin asignar para que aparezca como disponible
+            condicion_vehiculo='regular',  # Condición por defecto
+            estado_reparacion='pendiente',  # Estado pendiente para que los mecánicos puedan tomarla
+        )
+        
+        logger.info(f"✅ Reparación creada exitosamente: Cliente {cliente.nombre} ({cliente.telefono}), Vehículo {vehiculo.marca} {vehiculo.modelo} ({vehiculo.placa}), Reparación ID {reparacion.id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error al crear reparación en BD: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
+
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela la conversación actual"""
+    await update.message.reply_text(
+        "❌ *Proceso cancelado*\n\n"
+        "Si quieres agendar una cita, usa /start nuevamente."
+    )
+    
+    return ConversationHandler.END
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Muestra mensaje de ayuda"""
+    help_text = """
+🔧 *Ayuda del Bot del Taller Mecánico* 🔧
+
+Comandos disponibles:
+/start - Iniciar proceso de agendar cita
+/cancel - Cancelar el proceso actual
+/help - Mostrar este mensaje de ayuda
+
+📞 *Contacto del taller:*
+[Teléfono del taller]
+[Dirección del taller]
+
+⏰ *Horario de atención:*
+Lunes a Viernes: 8:00 AM - 6:00 PM
+Sábados: 8:00 AM - 12:00 PM
+"""
+    
+    await update.message.reply_text(help_text, parse_mode='Markdown')

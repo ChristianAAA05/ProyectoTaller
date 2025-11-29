@@ -21,6 +21,7 @@ El proyecto está configurado para:
 """
 
 from pathlib import Path
+from decouple import config
 
 # ========== RUTAS DEL PROYECTO ==========
 # Rutas base del proyecto para archivos estáticos, plantillas, etc.
@@ -158,10 +159,19 @@ def permisos_context(request):
 
 # ========== CONFIGURACIÓN DE AUTENTICACIÓN ==========
 LOGIN_URL = 'login'           # URL de login
-LOGIN_REDIRECT_URL = 'inicio' # Redirección después de login exitoso
+LOGIN_REDIRECT_URL = '/' # Redirección después de login exitoso (la vista login_view maneja la redirección por rol)
 LOGOUT_REDIRECT_URL = 'login'  # Redirección después de logout
 
 # Backend de autenticación (usando el estándar de Django)
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# ========== CONFIGURACIÓN DEL BOT DE TELEGRAM ==========
+# Token del bot de Telegram (obtener de @BotFather)
+# Se carga desde variables de entorno (.env file) para seguridad
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+
+# Configuración adicional para webhooks (opcional)
+TELEGRAM_BOT_WEBHOOK_URL = config('TELEGRAM_BOT_WEBHOOK_URL', default='')
+TELEGRAM_BOT_WEBHOOK_PORT = config('TELEGRAM_BOT_WEBHOOK_PORT', default=8443, cast=int)

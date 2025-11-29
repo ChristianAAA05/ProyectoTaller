@@ -175,6 +175,18 @@ class Reparacion(models.Model):
     )
     fecha_ingreso = models.DateTimeField(auto_now_add=True)  # Fecha automática de ingreso
     fecha_salida = models.DateTimeField(null=True, blank=True)  # Fecha de entrega
+    fecha_programada = models.DateField(
+        null=True, 
+        blank=True,
+        verbose_name='Fecha Programada',
+        help_text='Fecha en que el cliente llevará el vehículo al taller'
+    )
+    hora_programada = models.TimeField(
+        null=True, 
+        blank=True,
+        verbose_name='Hora Programada',
+        help_text='Hora en que el cliente llevará el vehículo al taller'
+    )
     condicion_vehiculo = models.CharField(
         max_length=20, 
         choices=CONDICION_OPCIONES, 
